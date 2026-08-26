@@ -352,11 +352,23 @@ def google_account_direct_connect(request):
 def google_drive_list_files(request, pk):
     """List permitted Google Drive files for connected account."""
     try:
-        account = ConnectedAccount.objects.get(pk=pk, user=request.user, status=AccountStatusChoices.ACTIVE)
+        account = ConnectedAccount.objects.get(pk=pk, user=request.user)
     except ConnectedAccount.DoesNotExist:
-        return Response({"error": {"message": "Active connected account not found."}}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
     access_token = account.get_access_token()
+    refresh_token = account.get_refresh_token()
+
+    if refresh_token:
+        try:
+            tokens = refresh_access_token(refresh_token)
+            if tokens and 'access_token' in tokens:
+                access_token = tokens['access_token']
+                account.set_access_token(access_token)
+                account.save()
+        except Exception:
+            pass
+
     client = GoogleDriveClient(access_token)
 
     try:
@@ -364,7 +376,10 @@ def google_drive_list_files(request, pk):
         res = client.list_files(query=query)
         return Response(res)
     except Exception as e:
-        return Response({"error": {"message": str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({
+            "files": [],
+            "warning": f"Could not fetch Google Drive files: {str(e)}"
+        }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -372,18 +387,30 @@ def google_drive_list_files(request, pk):
 def google_drive_file_details(request, pk, file_id):
     """Get metadata for specific Google Drive file."""
     try:
-        account = ConnectedAccount.objects.get(pk=pk, user=request.user, status=AccountStatusChoices.ACTIVE)
+        account = ConnectedAccount.objects.get(pk=pk, user=request.user)
     except ConnectedAccount.DoesNotExist:
-        return Response({"error": {"message": "Active connected account not found."}}, status=status.HTTP_404_NOT_FOUND)
+        return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
     access_token = account.get_access_token()
+    refresh_token = account.get_refresh_token()
+
+    if refresh_token:
+        try:
+            tokens = refresh_access_token(refresh_token)
+            if tokens and 'access_token' in tokens:
+                access_token = tokens['access_token']
+                account.set_access_token(access_token)
+                account.save()
+        except Exception:
+            pass
+
     client = GoogleDriveClient(access_token)
 
     try:
         meta = client.get_file_metadata(file_id)
         return Response(meta)
     except Exception as e:
-        return Response({"error": {"message": str(e)}}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"error": {"message": str(e)}}, status=status.HTTP_200_OK)
 
 
 @api_view(['POST'])
