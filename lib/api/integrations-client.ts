@@ -25,8 +25,11 @@ export interface DriveFile {
 }
 
 export const integrationsClient = {
-  startGoogleOAuth: async (redirectUri?: string): Promise<{ authorization_url: string; state: string }> => {
-    const query = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
+  startGoogleOAuth: async (redirectUri?: string, clientId?: string): Promise<{ authorization_url: string; state: string }> => {
+    const params = new URLSearchParams();
+    if (redirectUri) params.append('redirect_uri', redirectUri);
+    if (clientId) params.append('client_id', clientId);
+    const query = params.toString() ? `?${params.toString()}` : '';
     return api.get<{ authorization_url: string; state: string }>(`/integrations/google/start/${query}`);
   },
 

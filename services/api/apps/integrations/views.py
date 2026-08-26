@@ -60,7 +60,8 @@ def google_oauth_start(request):
         expires_at=expires_at
     )
 
-    auth_url = get_authorization_url(state, code_challenge, redirect_uri)
+    custom_client_id = request.query_params.get('client_id')
+    auth_url = get_authorization_url(state, code_challenge, redirect_uri, client_id=custom_client_id)
 
     log_audit_event(
         action="auth.google_oauth_started",

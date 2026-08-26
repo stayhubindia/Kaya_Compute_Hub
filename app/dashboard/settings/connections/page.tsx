@@ -21,6 +21,7 @@ export default function ConnectionsSettingsPage() {
   const [oauthState, setOauthState] = useState<string | null>(null);
   const [authCodeInput, setAuthCodeInput] = useState('');
   const [accountEmailInput, setAccountEmailInput] = useState('stayhubindia@gmail.com');
+  const [clientIdInput, setClientIdInput] = useState('');
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [isVerifyingCode, setIsVerifyingCode] = useState(false);
 
@@ -58,7 +59,7 @@ export default function ConnectionsSettingsPage() {
     setError(null);
     setActionMessage(null);
     try {
-      const res = await integrationsClient.startGoogleOAuth();
+      const res = await integrationsClient.startGoogleOAuth(undefined, clientIdInput.trim() || undefined);
       setGeneratedUrl(res.authorization_url);
       setOauthState(res.state);
       setActionMessage('🔗 Google Authorization link generated! Click below to open in Google, then paste the returned authorization code.');
@@ -183,7 +184,23 @@ export default function ConnectionsSettingsPage() {
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px' }}>
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <input
+              type="text"
+              value={clientIdInput}
+              onChange={(e) => setClientIdInput(e.target.value)}
+              placeholder="Google Client ID (Optional)"
+              style={{
+                background: '#1e293b',
+                border: '1px solid #475569',
+                color: '#fff',
+                padding: '10px 14px',
+                borderRadius: '8px',
+                fontSize: '13px',
+                width: '220px'
+              }}
+            />
+
             <button
               onClick={handleGenerateAuthLink}
               disabled={isGeneratingLink}

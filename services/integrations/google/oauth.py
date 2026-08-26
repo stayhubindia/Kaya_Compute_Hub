@@ -23,9 +23,10 @@ def generate_state() -> str:
     """Generate cryptographically secure OAuth state parameter."""
     return secrets.token_urlsafe(32)
 
-def get_authorization_url(state: str, code_challenge: str, redirect_uri: str) -> str:
+def get_authorization_url(state: str, code_challenge: str, redirect_uri: str, client_id: str = None) -> str:
     """Construct Google OAuth 2.0 Authorization URL with PKCE."""
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "demo-client-id.apps.googleusercontent.com")
+    if not client_id:
+        client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "demo-client-id.apps.googleusercontent.com")
     scopes = " ".join(get_configured_scopes())
 
     params = {
