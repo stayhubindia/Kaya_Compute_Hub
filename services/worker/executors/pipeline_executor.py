@@ -12,7 +12,7 @@ from typing import Any, Callable, Dict, Optional
 
 from services.pipeline_core.storage.manager import FolderContractManager, compute_sha256, atomic_write_json
 from services.pipeline_core.ingestion.pipeline import KnowledgeIngestionPipeline
-from services.pipeline_core.generation.pipeline import SyntheticGenerationPipeline
+from services.pipeline_core.generation.pipeline import ScientificGenerationPipeline as SyntheticGenerationPipeline
 from services.pipeline_core.dataset.release_qa import ReleaseQualityAuditor
 from services.pipeline_core.dataset.production import DatasetFreezeManager
 
