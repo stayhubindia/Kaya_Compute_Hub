@@ -27,11 +27,25 @@ interface PipelinePayload {
 
 export default function DatasetFactoryPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<"ingest" | "generate" | "qa" | "freeze" | "train" | "sync">("ingest");
+  const [activeTab, setActiveTab] = useState<"arxiv" | "ingest" | "generate" | "qa" | "freeze" | "train" | "sync">("arxiv");
 
   // Accounts State
   const [colabAccounts, setColabAccounts] = useState<ConnectedAccount[]>([]);
   const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+
+  // ArXiv Batch Downloader State
+  const [arxivCategory, setArxivCategory] = useState("cs.AI");
+  const [arxivMonth, setArxivMonth] = useState(() => {
+    const d = new Date(); d.setMonth(d.getMonth() - 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [arxivWorkers, setArxivWorkers] = useState(4);
+  const [arxivDelay, setArxivDelay] = useState(1.0);
+  const [arxivJobId, setArxivJobId] = useState<string | null>(null);
+  const [arxivStats, setArxivStats] = useState<any>(null);
+  const [arxivStatus, setArxivStatus] = useState<string>("");
+  const [arxivRunning, setArxivRunning] = useState(false);
+  const [arxivLogs, setArxivLogs] = useState<string[]>([]);
 
   // Form State
   const [collectionSlug, setCollectionSlug] = useState("cybersecurity_v1");
@@ -282,6 +296,7 @@ export default function DatasetFactoryPage() {
         {/* Navigation Stage Tabs */}
         <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #1e293b', marginBottom: '28px', overflowX: 'auto', paddingBottom: '2px' }}>
           {[
+            { id: "arxiv", label: "📚 ArXiv Downloader", icon: "🔬" },
             { id: "ingest", label: "1. Document Ingestion", icon: "📄" },
             { id: "generate", label: "2. Candidate Generation", icon: "⚡" },
             { id: "qa", label: "3. QA & Release Audit", icon: "🛡️" },
@@ -319,6 +334,196 @@ export default function DatasetFactoryPage() {
 
         {/* Pipeline Controls Active Panel */}
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '28px', borderRadius: '16px', marginBottom: '36px' }}>
+          {/* TAB 0: ARXIV BATCH DOWNLOADER */}
+          {activeTab === "arxiv" && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div>
+                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  🔬 ArXiv Research Paper Batch Downloader
+                </h3>
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '6px', lineHeight: '1.6' }}>
+                  Discover and download complete research papers (HTML + PDF) from any ArXiv category and month.
+                  Uses the same polite, retry-safe engine as <code style={{ background: '#1e293b', padding: '2px 6px', borderRadius: '4px', color: '#38bdf8' }}>download_Manager.py</code> — now integrated into Kaya via background jobs.
+                </p>
+              </div>
+
+              {/* Config Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>ArXiv Category</label>
+                  <input
+                    type="text"
+                    value={arxivCategory}
+                    onChange={(e) => setArxivCategory(e.target.value)}
+                    placeholder="e.g. cs.AI, astro-ph, quant-ph"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc', fontFamily: 'monospace', fontSize: '14px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Month (YYYY-MM)</label>
+                  <input
+                    type="text"
+                    value={arxivMonth}
+                    onChange={(e) => setArxivMonth(e.target.value)}
+                    placeholder="e.g. 2025-01"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc', fontFamily: 'monospace', fontSize: '14px' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Parallel Workers (1–6)</label>
+                  <input
+                    type="number"
+                    min={1} max={6}
+                    value={arxivWorkers}
+                    onChange={(e) => setArxivWorkers(Number(e.target.value))}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Polite Delay (seconds)</label>
+                  <input
+                    type="number"
+                    min={0} max={10} step={0.5}
+                    value={arxivDelay}
+                    onChange={(e) => setArxivDelay(Number(e.target.value))}
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc' }}
+                  />
+                </div>
+              </div>
+
+              {/* Quick category presets */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {["cs.AI","cs.LG","cs.CR","cs.CV","cs.CL","astro-ph","quant-ph","math.OC","eess.SP"].map(cat => (
+                  <button
+                    key={cat}
+                    onClick={() => setArxivCategory(cat)}
+                    style={{
+                      padding: '5px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', fontFamily: 'monospace',
+                      background: arxivCategory === cat ? '#0284c722' : '#0f172a',
+                      border: arxivCategory === cat ? '1px solid #0284c7' : '1px solid #334155',
+                      color: arxivCategory === cat ? '#38bdf8' : '#94a3b8',
+                    }}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+
+              {/* Action Button */}
+              <button
+                disabled={arxivRunning || !arxivCategory || !arxivMonth}
+                onClick={async () => {
+                  setArxivRunning(true);
+                  setArxivStats(null);
+                  setArxivStatus("Queuing batch download job...");
+                  setArxivLogs([`[→] Starting ArXiv batch: ${arxivCategory} / ${arxivMonth}`]);
+                  try {
+                    const res = await fetch("/api/v1/arxiv/batch/start/", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ category: arxivCategory, month: arxivMonth, workers: arxivWorkers, delay: arxivDelay })
+                    });
+                    const data = await res.json();
+                    if (data.job_id) {
+                      setArxivJobId(data.job_id);
+                      setArxivStatus(`✅ Job queued: ${data.job_id.slice(0,8)}...`);
+                      setArxivLogs(prev => [...prev, `[✓] Job ID: ${data.job_id}`, `[→] Polling progress...`]);
+                      // Poll progress every 5s
+                      const poll = setInterval(async () => {
+                        try {
+                          const sr = await fetch(`/api/v1/arxiv/batch/${data.job_id}/status/`, { credentials: "include" });
+                          const sd = await sr.json();
+                          const st = sd.arxiv_stats || {};
+                          setArxivStats(st);
+                          setArxivStatus(`[${sd.status?.toUpperCase()}] ${st.processed || 0}/${st.total || '?'} papers | HTML: ${st.html || 0} PDF: ${st.pdf || 0}`);
+                          if (sd.status === "succeeded" || sd.status === "failed" || sd.status === "cancelled" || st.status === "complete") {
+                            clearInterval(poll);
+                            setArxivRunning(false);
+                            setArxivLogs(prev => [...prev, `[✓] Job finished: ${sd.status}`]);
+                          }
+                        } catch { clearInterval(poll); setArxivRunning(false); }
+                      }, 5000);
+                    } else {
+                      setArxivStatus(`❌ Error: ${data.error?.message || "Unknown error"}`);
+                      setArxivRunning(false);
+                    }
+                  } catch (err: any) {
+                    setArxivStatus(`❌ Network error: ${err.message}`);
+                    setArxivRunning(false);
+                  }
+                }}
+                style={{
+                  background: arxivRunning ? '#334155' : 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
+                  color: '#fff', padding: '14px 28px', borderRadius: '10px', fontWeight: '700', border: 'none',
+                  cursor: arxivRunning ? 'not-allowed' : 'pointer', fontSize: '15px',
+                  boxShadow: arxivRunning ? 'none' : '0 4px 14px rgba(79,70,229,0.4)',
+                  display: 'flex', alignItems: 'center', gap: '10px'
+                }}
+              >
+                {arxivRunning ? (
+                  <>⏳ Downloading ArXiv Papers — {arxivCategory} / {arxivMonth}...</>
+                ) : (
+                  <>🔬 Start ArXiv Batch Download ({arxivCategory} / {arxivMonth})</>
+                )}
+              </button>
+
+              {/* Status Banner */}
+              {arxivStatus && (
+                <div style={{ background: '#090d16', border: '1px solid #334155', borderRadius: '10px', padding: '12px 16px', fontSize: '13px', fontFamily: 'monospace', color: '#38bdf8' }}>
+                  {arxivStatus}
+                </div>
+              )}
+
+              {/* Live Stats Grid */}
+              {arxivStats && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                  {[
+                    { k: "total",     label: "Total",     color: '#f8fafc' },
+                    { k: "discovered",label: "Discovered", color: '#38bdf8' },
+                    { k: "processed", label: "Processed",  color: '#818cf8' },
+                    { k: "html",      label: "HTML ✓",     color: '#34d399' },
+                    { k: "pdf",       label: "PDF ✓",      color: '#2dd4bf' },
+                    { k: "existing",  label: "Cached",     color: '#94a3b8' },
+                    { k: "failed",    label: "Failed",     color: '#f87171' },
+                  ].map(({ k, label, color }) => (
+                    <div key={k} style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '22px', fontWeight: '800', color, fontVariantNumeric: 'tabular-nums' }}>{(arxivStats[k] || 0).toLocaleString()}</div>
+                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', marginTop: '4px' }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Progress bar */}
+              {arxivStats && (arxivStats.total || 0) > 0 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: '#94a3b8', marginBottom: '6px' }}>
+                    <span>{Math.round((arxivStats.processed / arxivStats.total) * 100)}% Complete</span>
+                    <span>ETA: {arxivStats.eta || '--'} | Speed: {arxivStats.speed || 0} papers/min</span>
+                  </div>
+                  <div style={{ background: '#1e293b', borderRadius: '10px', height: '10px', overflow: 'hidden' }}>
+                    <div style={{
+                      background: 'linear-gradient(to right, #4f46e5, #7c3aed)',
+                      height: '100%',
+                      width: `${Math.min(100, Math.round((arxivStats.processed / arxivStats.total) * 100))}%`,
+                      transition: 'width 0.5s ease',
+                      borderRadius: '10px'
+                    }} />
+                  </div>
+                </div>
+              )}
+
+              {/* Logs */}
+              {arxivLogs.length > 0 && (
+                <div style={{ background: '#060a12', border: '1px solid #1e293b', borderRadius: '10px', padding: '14px', fontFamily: 'monospace', fontSize: '12px', color: '#38bdf8', maxHeight: '160px', overflowY: 'auto' }}>
+                  <div style={{ color: '#475569', fontSize: '11px', fontWeight: '700', marginBottom: '8px' }}>ACTIVITY LOGS:</div>
+                  {arxivLogs.map((l, i) => <div key={i} style={{ margin: '2px 0' }}>{l}</div>)}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* TAB 1: INGESTION */}
           {activeTab === "ingest" && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

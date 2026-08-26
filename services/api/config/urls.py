@@ -12,7 +12,7 @@ from apps.jobs.views import JobViewSet
 from apps.workers.views import WorkerViewSet
 from apps.datasets.views import DatasetViewSet
 from apps.artifacts.views import ArtifactViewSet
-from apps.downloads.views import DownloadViewSet
+from apps.downloads.views import DownloadViewSet, arxiv_batch_start, arxiv_batch_status
 from apps.pipelines.views import PipelineDefinitionViewSet, ProcessingRunViewSet
 from apps.training.views import TrainingRunViewSet
 from apps.models_registry.views import ModelVersionViewSet
@@ -52,4 +52,6 @@ urlpatterns = [
     path('api/v1/', include('apps.events.urls')),
     path('api/v1/', include('apps.logs.urls')),
     path('api/v1/integrations/', include('apps.integrations.urls')),
+    path('api/v1/arxiv/batch/start/', arxiv_batch_start, name='arxiv-batch-start'),
+    path('api/v1/arxiv/batch/<str:job_id>/status/', arxiv_batch_status, name='arxiv-batch-status'),
 ]

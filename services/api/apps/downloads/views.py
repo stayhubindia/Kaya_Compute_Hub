@@ -178,3 +178,100 @@ class DownloadViewSet(viewsets.ModelViewSet):
             "expected_checksum": download_obj.expected_checksum,
             "verified": download_obj.actual_checksum == download_obj.expected_checksum if download_obj.expected_checksum else True
         })
+
+
+# ─── ArXiv Batch Download API ───────────────────────────────────────────────
+
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def arxiv_batch_start(request):
+    """
+    Start an ArXiv batch paper download job.
+
+    POST body:
+      category  - ArXiv category e.g. "cs.AI", "astro-ph", "quant-ph"  (required)
+      month     - Month string e.g. "2025-01"  (required)
+      workers   - Parallel threads 1-6  (default: 4)
+      delay     - Inter-paper delay seconds  (default: 1.0)
+    """
+    category = request.data.get("category", "").strip()
+    month    = request.data.get("month", "").strip()
+    workers  = int(request.data.get("workers", 4))
+    delay    = float(request.data.get("delay", 1.0))
+
+    if not category:
+        return Response({"error": {"message": "category is required."}}, status=status.HTTP_400_BAD_REQUEST)
+    if not month:
+        return Response({"error": {"message": "month is required (e.g. 2025-01)."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    from apps.jobs.models import Job, JobTypeChoices, JobStatusChoices
+    job = Job.objects.create(
+        created_by=request.user,
+        job_type=JobTypeChoices.DOWNLOAD,
+        status=JobStatusChoices.QUEUED,
+        metadata={
+            "source": "arxiv_batch",
+            "category": category,
+            "month": month,
+            "workers": workers,
+            "delay": delay,
+        }
+    )
+
+    log_audit_event(
+        action="arxiv_batch.started",
+        resource_type="job",
+        resource_id=str(job.id),
+        actor=request.user,
+        metadata={"category": category, "month": month},
+        request=request
+    )
+
+    try:
+        from services.worker.tasks.arxiv_tasks import arxiv_batch_download_task
+        arxiv_batch_download_task.delay(
+            job_id=str(job.id),
+            category=category,
+            month=month,
+            workers=max(1, min(workers, 6)),
+            delay=max(0.0, delay),
+        )
+    except Exception as exc:
+        job.metadata["task_error"] = str(exc)
+        job.save(update_fields=["metadata"])
+
+    return Response({
+        "job_id": str(job.id),
+        "status": "queued",
+        "category": category,
+        "month": month,
+        "workers": workers,
+        "message": f"ArXiv batch download job queued: {category} / {month}"
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def arxiv_batch_status(request, job_id: str):
+    """Get progress stats for a running ArXiv batch job."""
+    from apps.jobs.models import Job
+    try:
+        job = Job.objects.get(id=job_id, created_by=request.user)
+    except Job.DoesNotExist:
+        return Response({"error": {"message": "Job not found."}}, status=status.HTTP_404_NOT_FOUND)
+
+    arxiv_stats = (job.metadata or {}).get("arxiv_stats", {})
+    return Response({
+        "job_id": str(job.id),
+        "status": job.status,
+        "started_at": job.started_at.isoformat() if job.started_at else None,
+        "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+        "category": job.metadata.get("category"),
+        "month": job.metadata.get("month"),
+        "arxiv_stats": arxiv_stats,
+        "output_dir": arxiv_stats.get("output_dir", ""),
+    })
