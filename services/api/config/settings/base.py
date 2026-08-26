@@ -10,8 +10,10 @@ for p in [str(BASE_DIR), str(WORKSPACE_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'django-insecure-default-kaya-dev-key-change-in-prod')
-TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY')
+import secrets
+
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or secrets.token_urlsafe(64)
+TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY') or secrets.token_urlsafe(64)
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 

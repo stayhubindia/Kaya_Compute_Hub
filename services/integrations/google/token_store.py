@@ -13,8 +13,11 @@ def _get_fernet() -> Fernet:
         b64_key = base64.urlsafe_b64encode(hashed)
         return Fernet(b64_key)
     
-    # Fallback to Django SECRET_KEY if available or static dev key
-    secret = os.environ.get("DJANGO_SECRET_KEY", "dev-secret-key-change-in-prod")
+    # Fallback to Django SECRET_KEY if available or dynamically generated key
+    secret = os.environ.get("DJANGO_SECRET_KEY") or os.environ.get("SECRET_KEY")
+    if not secret:
+        import secrets
+        secret = secrets.token_urlsafe(64)
     hashed = hashlib.sha256(secret.encode("utf-8")).digest()
     b64_key = base64.urlsafe_b64encode(hashed)
     return Fernet(b64_key)
