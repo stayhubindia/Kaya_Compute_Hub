@@ -98,7 +98,10 @@ class CodeExecuteView(APIView):
                 progress_stage="queued"
             )
             try:
-                execute_job.delay(str(job.id))
+                if hasattr(execute_job, 'delay'):
+                    execute_job.delay(str(job.id))
+                else:
+                    execute_job(str(job.id))
             except Exception as err:
                 logger.warning(f"Worker dispatch warning for job {job.id}: {err}")
 
