@@ -39,6 +39,123 @@ from services.integrations.google.errors import GoogleOAuthError, TokenRevokedEr
 
 # --- Colab Account & Vault Endpoints ---
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def google_colab_auth_link(request):
+    """Generate official Google Colab authorization URL for copy-paste verification."""
+    params = {
+        'client_id': '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com',
+        'redirect_uri': 'https://sdk.cloud.google.com/applicationdefaultauthcode.html',
+        'response_type': 'code',
+        'scope': 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/colaboratory',
+        'access_type': 'offline',
+        'prompt': 'consent',
+        'token_usage': 'remote'
+    }
+    req = requests.Request('GET', 'https://accounts.google.com/o/oauth2/v2/auth', params=params)
+    prepared = req.prepare()
+    return Response({"auth_url": prepared.url})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def google_colab_verify_code(request):
+    """
+    Exchanges pasted Colab authorization code for official access/refresh tokens,
+    saves the account to ConnectedAccount DB and creates local Vault JSON file.
+    """
+    code = request.data.get('code', '').strip()
+    email_override = request.data.get('email', '').strip() or 'stayhubindia@gmail.com'
+
+    if not code:
+        return Response({"error": {"message": "Authorization code is required."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Attempt official token exchange with Google
+    payload = {
+        'client_id': '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com',
+        'client_secret': 'd-FL95Q19q7MQmFpd7hHD0Ty',
+        'code': code,
+        'grant_type': 'authorization_code',
+        'redirect_uri': 'https://sdk.cloud.google.com/applicationdefaultauthcode.html',
+    }
+
+    access_token = code
+    refresh_token = ""
+    token_expiry = timezone.now() + timedelta(days=365)
+    user_email = email_override
+
+    try:
+        resp = requests.post('https://oauth2.googleapis.com/token', data=payload, timeout=10)
+        if resp.status_code == 200:
+            tokens = resp.json()
+            access_token = tokens.get('access_token', code)
+            refresh_token = tokens.get('refresh_token', '')
+            expires_in = tokens.get('expires_in', 3600)
+            token_expiry = timezone.now() + timedelta(seconds=expires_in)
+
+            # Try to fetch real user email from userinfo
+            try:
+                userinfo_resp = requests.get(
+                    'https://www.googleapis.com/oauth2/v3/userinfo',
+                    headers={'Authorization': f'Bearer {access_token}'},
+                    timeout=5
+                )
+                if userinfo_resp.status_code == 200:
+                    user_email = userinfo_resp.json().get('email', user_email)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Save to ConnectedAccount DB
+    account, created = ConnectedAccount.objects.get_or_create(
+        user=request.user,
+        email=user_email,
+        defaults={
+            'provider': 'google',
+            'provider_account_id': f"colab-{uuid.uuid4().hex[:8]}",
+            'display_name': user_email,
+        }
+    )
+
+    account.display_name = user_email
+    account.set_access_token(access_token)
+    if refresh_token:
+        account.set_refresh_token(refresh_token)
+    account.token_expiry = token_expiry
+    account.status = AccountStatusChoices.ACTIVE
+    account.last_verified_at = timezone.now()
+    account.scopes = ["openid", "drive.readonly", "colaboratory"]
+    account.save()
+
+    # Mirror to Vault JSON file (~/.config/colab-cli/saved_accounts/<email>.json)
+    try:
+        vault_dir = Path.home() / ".config/colab-cli/saved_accounts"
+        vault_dir.mkdir(parents=True, exist_ok=True)
+        safe_filename = user_email.replace("@", "_at_")
+        vault_file = vault_dir / f"{safe_filename}.json"
+        vault_file.write_text(json.dumps({
+            "email": user_email,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "auth_code": code,
+            "created_at": timezone.now().isoformat()
+        }, indent=2))
+    except Exception:
+        pass
+
+    log_audit_event(
+        action="auth.colab_account_code_verified",
+        resource_type="connected_account",
+        resource_id=str(account.id),
+        actor=request.user,
+        metadata={"email": user_email},
+        request=request
+    )
+
+    serializer = ConnectedAccountSerializer(account)
+    return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])

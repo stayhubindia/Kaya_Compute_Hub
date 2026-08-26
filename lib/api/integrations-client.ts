@@ -25,6 +25,14 @@ export interface DriveFile {
 }
 
 export const integrationsClient = {
+  getColabAuthLink: async (): Promise<{ auth_url: string }> => {
+    return api.get<{ auth_url: string }>('/integrations/google/auth-link/');
+  },
+
+  verifyColabCode: async (data: { code: string; email?: string }): Promise<ConnectedAccount> => {
+    return api.post<ConnectedAccount>('/integrations/google/verify-code/', data);
+  },
+
   listConnectedAccounts: async (): Promise<ConnectedAccount[]> => {
     const res = await api.get<{ results: ConnectedAccount[] }>('/integrations/google/accounts/');
     return res.results || [];

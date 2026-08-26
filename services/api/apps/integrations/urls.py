@@ -3,6 +3,8 @@ from apps.integrations import views
 
 urlpatterns = [
     # Colab Vault Account Endpoints
+    path('google/auth-link/', views.google_colab_auth_link, name='google-colab-auth-link'),
+    path('google/verify-code/', views.google_colab_verify_code, name='google-colab-verify-code'),
     path('google/direct-connect/', views.google_account_direct_connect, name='google-account-direct-connect'),
     path('google/accounts/', views.google_accounts_list, name='google-accounts-list'),
     path('google/<uuid:pk>/verify/', views.google_account_verify, name='google-account-verify'),

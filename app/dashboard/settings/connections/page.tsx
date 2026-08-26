@@ -16,13 +16,13 @@ export default function ConnectionsSettingsPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Direct Vault Entry Form State
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [email, setEmail] = useState('stayhubindia@gmail.com');
-  const [displayName, setDisplayName] = useState('');
-  const [accessToken, setAccessToken] = useState('');
-  const [refreshToken, setRefreshToken] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Colab Auth Panel State
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authLink, setAuthLink] = useState<string | null>(null);
+  const [authCode, setAuthCode] = useState('');
+  const [authEmail, setAuthEmail] = useState('stayhubindia@gmail.com');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [isFetchingLink, setIsFetchingLink] = useState(false);
 
   const loadData = async () => {
     try {
@@ -44,48 +44,67 @@ export default function ConnectionsSettingsPage() {
     loadData();
   }, []);
 
-  // Direct Token / Account Vault Submit
-  const handleDirectConnectSubmit = async (e: React.FormEvent) => {
+  // Fetch Colab Auth Link
+  const handleOpenAuthModal = async (presetEmail?: string) => {
+    if (presetEmail) setAuthEmail(presetEmail);
+    setShowAuthModal(true);
+    setError(null);
+
+    if (!authLink) {
+      try {
+        setIsFetchingLink(true);
+        const res = await integrationsClient.getColabAuthLink();
+        setAuthLink(res.auth_url);
+      } catch (err: any) {
+        setError('Failed to generate Colab authentication link.');
+      } finally {
+        setIsFetchingLink(false);
+      }
+    }
+  };
+
+  // Submit Authorization Code
+  const handleVerifyCodeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email) {
-      setError('Google / Colab Account Email is required.');
+    if (!authCode.trim()) {
+      setError('Please paste the authorization code from Google.');
       return;
     }
 
-    setIsSubmitting(true);
+    setIsVerifying(true);
     setError(null);
     setActionMessage(null);
 
     try {
-      await integrationsClient.directConnectAccount({
-        email: email.trim(),
-        display_name: displayName.trim() || email.trim(),
-        access_token: accessToken.trim(),
-        refresh_token: refreshToken.trim(),
+      const res = await integrationsClient.verifyColabCode({
+        code: authCode.trim(),
+        email: authEmail.trim() || undefined,
       });
 
-      setActionMessage(`🎉 Colab Account [${email}] successfully registered in Vault!`);
-      setEmail('stayhubindia@gmail.com');
-      setDisplayName('');
-      setAccessToken('');
-      setRefreshToken('');
-      setShowAddForm(false);
+      setActionMessage(`🎉 Colab Account [${res.email || authEmail}] verified & saved to Vault!`);
+      setAuthCode('');
+      setShowAuthModal(false);
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Failed to register Colab Account token in Vault.');
+      setError(err?.message || 'Failed to verify Colab authorization code.');
     } finally {
-      setIsSubmitting(false);
+      setIsVerifying(false);
     }
   };
 
-  const handleVerify = async (id: string) => {
+  const handleVerifyStatus = async (acc: ConnectedAccount) => {
     try {
-      setActionMessage('Verifying account status...');
-      const res = await integrationsClient.verifyAccount(id);
-      setActionMessage(`Account status: ${res.status}`);
+      setActionMessage(`Verifying Vault status for [${acc.email}]...`);
+      const res = await integrationsClient.verifyAccount(acc.id);
+      if (res.status === 'active') {
+        setActionMessage(`✅ Account [${acc.email}] is active in Vault!`);
+      } else {
+        // Open Auth modal directly if verification needed
+        handleOpenAuthModal(acc.email);
+      }
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Failed to verify account.');
+      handleOpenAuthModal(acc.email);
     }
   };
 
@@ -123,26 +142,27 @@ export default function ConnectionsSettingsPage() {
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Colab Account Vault</h1>
             <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
-              Manage registered Colab accounts & storage credentials for Dataset Factory and Colab GPU Workers.
+              Authenticate & manage Colab GPU Worker accounts via Google Colab verification link.
             </p>
           </div>
 
           <button
-            onClick={() => setShowAddForm(!showAddForm)}
+            onClick={() => handleOpenAuthModal()}
             style={{
               background: '#0284c7',
               color: '#fff',
-              padding: '10px 20px',
+              padding: '12px 22px',
               borderRadius: '8px',
-              fontWeight: '600',
+              fontWeight: '700',
               border: 'none',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              gap: '8px'
+              gap: '8px',
+              boxShadow: '0 4px 14px rgba(2,132,199,0.3)'
             }}
           >
-            {showAddForm ? '✕ Close Form' : '➕ Register Colab Account'}
+            🔑 Authenticate Colab Account
           </button>
         </div>
 
@@ -154,64 +174,118 @@ export default function ConnectionsSettingsPage() {
 
         {error && <ErrorState message={error} />}
 
-        {/* Direct Account Vault Entry Form */}
-        {showAddForm && (
-          <div style={{ background: '#1e293b', border: '1px solid #38bdf8', borderRadius: '12px', padding: '24px', marginBottom: '28px' }}>
-            <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#38bdf8' }}>
-              ⚙️ Add Colab Account Credentials to Vault
-            </h2>
-            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '16px' }}>
-              Enter account details and token credentials to register your Colab account directly into local vault storage (`~/.config/colab-cli/saved_accounts/`).
+        {/* Colab Interactive Link & Verification Modal/Panel */}
+        {showAuthModal && (
+          <div style={{ background: '#0f172a', border: '2px solid #0284c7', borderRadius: '14px', padding: '24px', marginBottom: '28px', boxShadow: '0 10px 30px rgba(2,132,199,0.2)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+              <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#38bdf8' }}>
+                ⚡ Colab Google Authentication (Link & Code Verification)
+              </h2>
+              <button
+                onClick={() => setShowAuthModal(false)}
+                style={{ background: 'transparent', border: 'none', color: '#94a3b8', fontSize: '18px', cursor: 'pointer' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '20px' }}>
+              Jaise new Google Colab notebook require karta hai: Link par click karke Google account approve karein, phir screen par aane wala <strong>Authorization Code</strong> yaha paste karke verify karein!
             </p>
 
-            <form onSubmit={handleDirectConnectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+            {/* Step 1: Auth Link */}
+            <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '16px', marginBottom: '20px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#0284c7', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 1: Open Google Auth Link</span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginTop: '10px' }}>
+                {isFetchingLink ? (
+                  <span style={{ color: '#94a3b8', fontSize: '13px' }}>Generating Colab auth link...</span>
+                ) : authLink ? (
+                  <>
+                    <a
+                      href={authLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        background: '#0284c7',
+                        color: '#fff',
+                        padding: '10px 20px',
+                        borderRadius: '6px',
+                        fontWeight: '700',
+                        textDecoration: 'none',
+                        fontSize: '14px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px'
+                      }}
+                    >
+                      🔗 Click Here to Open Google Authorization Page ↗
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(authLink);
+                        alert('Auth link copied to clipboard!');
+                      }}
+                      style={{ background: '#334155', color: '#cbd5e1', border: 'none', padding: '10px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                    >
+                      📋 Copy Link
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            </div>
+
+            {/* Step 2: Form */}
+            <form onSubmit={handleVerifyCodeSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <span style={{ fontSize: '12px', fontWeight: '700', color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Step 2: Paste Authorization Code & Verify</span>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '16px' }}>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Colab / Google Email *</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Google / Colab Email *</label>
                   <input
                     type="email"
                     required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    value={authEmail}
+                    onChange={(e) => setAuthEmail(e.target.value)}
                     placeholder="stayhubindia@gmail.com"
-                    style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
+                    style={{ width: '100%', padding: '10px', background: '#090d16', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
                   />
                 </div>
+
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Account Alias / Name</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Google Authorization Code *</label>
                   <input
                     type="text"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="Colab GPU Worker 1"
-                    style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
+                    required
+                    value={authCode}
+                    onChange={(e) => setAuthCode(e.target.value)}
+                    placeholder="Paste code from Google here (e.g., 4/1AY0e-g...)"
+                    style={{ width: '100%', padding: '10px', background: '#090d16', border: '1px solid #0284c7', borderRadius: '6px', color: '#86efac', fontFamily: 'monospace', fontWeight: '600' }}
                   />
                 </div>
               </div>
 
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Access Token / Auth Credential (Optional)</label>
-                <input
-                  type="text"
-                  value={accessToken}
-                  onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="Paste access token, refresh token, or auth code"
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff', fontFamily: 'monospace' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px', marginTop: '6px' }}>
+              <div style={{ display: 'flex', gap: '12px' }}>
                 <button
                   type="submit"
-                  disabled={isSubmitting}
-                  style={{ background: '#0284c7', color: '#fff', padding: '10px 24px', borderRadius: '6px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
+                  disabled={isVerifying}
+                  style={{
+                    background: '#16a34a',
+                    color: '#fff',
+                    padding: '12px 28px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    boxShadow: '0 4px 14px rgba(22,163,74,0.3)'
+                  }}
                 >
-                  {isSubmitting ? 'Saving...' : '💾 Save Account to Vault'}
+                  {isVerifying ? 'Verifying & Saving...' : '✅ Verify Code & Save to Vault'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowAddForm(false)}
-                  style={{ background: '#475569', color: '#fff', padding: '10px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+                  onClick={() => setShowAuthModal(false)}
+                  style={{ background: '#475569', color: '#fff', padding: '12px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
                 >
                   Cancel
                 </button>
@@ -224,7 +298,7 @@ export default function ConnectionsSettingsPage() {
         {accounts.length === 0 ? (
           <EmptyState
             title="No Colab Accounts Registered in Vault"
-            description="Click '➕ Register Colab Account' above to add your account credentials."
+            description="Click '🔑 Authenticate Colab Account' above to generate the Google auth link and register your account."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -263,10 +337,10 @@ export default function ConnectionsSettingsPage() {
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button
-                    onClick={() => handleVerify(acc.id)}
-                    style={{ background: '#334155', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '6px', fontSize: '13px', cursor: 'pointer' }}
+                    onClick={() => handleVerifyStatus(acc)}
+                    style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
                   >
-                    Verify
+                    Verify Account
                   </button>
                   <button
                     onClick={() => handleDisconnect(acc.id)}
