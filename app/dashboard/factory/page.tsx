@@ -144,126 +144,122 @@ export default function DatasetFactoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#090d16] text-slate-100 font-sans selection:bg-sky-500 selection:text-white">
+    <div style={{ background: '#090d16', minHeight: '100vh', color: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
       <DashboardNavbar user={user} />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '32px 24px' }}>
         {/* Header Title Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between border-b border-slate-800/80 pb-6 mb-8 gap-4">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px', borderBottom: '1px solid #1e293b', paddingBottom: '20px', marginBottom: '28px' }}>
           <div>
-            <div className="flex items-center space-x-3 mb-1">
-              <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-sky-400 via-teal-300 to-indigo-400 bg-clip-text text-transparent">
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+              <h1 style={{ fontSize: '28px', fontWeight: '800', background: 'linear-gradient(135deg, #38bdf8 0%, #2dd4bf 50%, #818cf8 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                 Dataset Factory & Training Orchestrator
               </h1>
-              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5 animate-pulse"></span>
-                System Operational
+              <span style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid rgba(16, 185, 129, 0.3)', color: '#34d399', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#34d399' }}></span>
+                Operational
               </span>
             </div>
-            <p className="text-slate-400 text-sm">
+            <p style={{ color: '#94a3b8', fontSize: '14px', margin: 0 }}>
               Automated document extraction, candidate generation, QA release gates, version freezing, and QLoRA training.
             </p>
           </div>
 
-          <div className="flex items-center space-x-3">
-            <Link
-              href="/dashboard/jobs"
-              className="px-4 py-2 text-xs font-semibold rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors shadow-sm"
-            >
-              📋 View Job Queue ({recentJobs.length})
-            </Link>
-          </div>
+          <Link
+            href="/dashboard/jobs"
+            style={{ background: '#1e293b', border: '1px solid #334155', color: '#f1f5f9', padding: '10px 18px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+          >
+            📋 View Job Queue ({recentJobs.length})
+          </Link>
         </div>
 
         {/* System Summary KPI Stats */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Active Pipeline Tasks</div>
-            <div className="text-2xl font-bold text-sky-400 mt-1">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '20px', borderRadius: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px' }}>Active Pipeline Tasks</div>
+            <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8', marginTop: '6px' }}>
               {recentJobs.filter((j) => ["queued", "running", "leased"].includes(j.status)).length} Running
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">Celery Worker Isolated Queue</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Celery Worker Queue</div>
           </div>
 
-          <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Default Base Model</div>
-            <div className="text-lg font-bold text-teal-300 mt-1 truncate">{baseModel}</div>
-            <div className="text-[11px] text-slate-500 mt-1">4-Bit QLoRA Ready</div>
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '20px', borderRadius: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px' }}>Default Base Model</div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#2dd4bf', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{baseModel}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>4-Bit QLoRA Ready</div>
           </div>
 
-          <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Target Collection</div>
-            <div className="text-lg font-bold text-indigo-300 mt-1 truncate">{collectionSlug}</div>
-            <div className="text-[11px] text-slate-500 mt-1">Version {versionName}</div>
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '20px', borderRadius: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px' }}>Target Collection</div>
+            <div style={{ fontSize: '16px', fontWeight: '700', color: '#818cf8', marginTop: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{collectionSlug}</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Version {versionName}</div>
           </div>
 
-          <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Colab Accounts in Vault</div>
-            <div className="text-lg font-bold text-emerald-400 mt-1">
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '20px', borderRadius: '12px' }}>
+            <div style={{ fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', color: '#64748b', letterSpacing: '0.5px' }}>Colab Accounts in Vault</div>
+            <div style={{ fontSize: '18px', fontWeight: '700', color: '#34d399', marginTop: '6px' }}>
               {colabAccounts.length} Active {colabAccounts.length === 1 ? 'Account' : 'Accounts'}
             </div>
-            <div className="text-[11px] text-slate-500 mt-1">Direct Vault Credentials</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Direct Vault Credentials</div>
           </div>
         </div>
 
         {/* Alert Status Banner */}
         {statusMessage && (
           <div
-            className={`mb-6 p-4 rounded-xl border text-sm font-mono flex items-center justify-between shadow-lg transition-all ${
-              statusMessage.type === "success"
-                ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-                : "bg-rose-950/40 border-rose-500/40 text-rose-300"
-            }`}
+            style={{
+              padding: '16px 20px',
+              borderRadius: '10px',
+              marginBottom: '24px',
+              fontSize: '14px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: statusMessage.type === 'success' ? 'rgba(6, 78, 59, 0.4)' : 'rgba(136, 19, 55, 0.4)',
+              border: statusMessage.type === 'success' ? '1px solid #059669' : '1px solid #e11d48',
+              color: statusMessage.type === 'success' ? '#6ee7b7' : '#fda4af'
+            }}
           >
-            <div className="flex items-center space-x-2">
-              <span>{statusMessage.type === "success" ? "✓" : "⚠️"}</span>
-              <span>{statusMessage.text}</span>
-            </div>
-            <button
-              onClick={() => setStatusMessage(null)}
-              className="text-xs text-slate-400 hover:text-slate-200 ml-4 underline"
-            >
-              Dismiss
-            </button>
+            <span>{statusMessage.text}</span>
+            <button onClick={() => setStatusMessage(null)} style={{ background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer', fontSize: '13px', textDecoration: 'underline' }}>Dismiss</button>
           </div>
         )}
 
         {/* Global Collection Configuration Header Card */}
-        <div className="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-950 border border-slate-800 p-6 rounded-2xl mb-8 shadow-xl">
-          <h2 className="text-sm font-semibold uppercase tracking-wider text-sky-400 mb-4 flex items-center">
-            <span className="w-2 h-2 rounded-full bg-sky-400 mr-2"></span>
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '24px', borderRadius: '14px', marginBottom: '28px' }}>
+          <h2 style={{ fontSize: '13px', fontWeight: '700', textTransform: 'uppercase', color: '#38bdf8', letterSpacing: '0.5px', marginBottom: '16px' }}>
             Global Collection Context & Worker Credentials
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Collection Identifier Slug</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Collection Identifier Slug</label>
               <input
                 type="text"
                 value={collectionSlug}
                 onChange={(e) => setCollectionSlug(e.target.value)}
                 placeholder="e.g. cybersecurity_v1"
-                className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-mono"
+                style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc', fontFamily: 'monospace', fontSize: '14px' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Source Dataset Name</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Source Dataset Name</label>
               <input
                 type="text"
                 value={sourceName}
                 onChange={(e) => setSourceName(e.target.value)}
                 placeholder="e.g. arXiv Security Papers"
-                className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
+                style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc', fontSize: '14px' }}
               />
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1.5">Assigned Colab Account (Vault)</label>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Assigned Colab Account (Vault)</label>
               {colabAccounts.length > 0 ? (
                 <select
                   value={selectedAccountId}
                   onChange={(e) => setSelectedAccountId(e.target.value)}
-                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-sky-300 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #0284c7', borderRadius: '8px', padding: '10px 14px', color: '#38bdf8', fontWeight: '600', fontSize: '14px' }}
                 >
                   {colabAccounts.map((acc) => (
                     <option key={acc.id} value={acc.id}>
@@ -274,7 +270,7 @@ export default function DatasetFactoryPage() {
               ) : (
                 <Link
                   href="/dashboard/settings/connections"
-                  className="block text-xs text-amber-400 bg-amber-950/40 border border-amber-800/60 p-2.5 rounded-lg text-center hover:underline"
+                  style={{ display: 'block', padding: '10px', background: 'rgba(217, 119, 6, 0.15)', border: '1px solid #d97706', color: '#fbbf24', borderRadius: '8px', fontSize: '12px', textDecoration: 'none', textAlign: 'center' }}
                 >
                   ⚠️ No Colab Accounts linked. Click to Register in Vault
                 </Link>
@@ -284,25 +280,35 @@ export default function DatasetFactoryPage() {
         </div>
 
         {/* Navigation Stage Tabs */}
-        <div className="flex border-b border-slate-800 mb-8 space-x-1 overflow-x-auto pb-1 scrollbar-none">
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid #1e293b', marginBottom: '28px', overflowX: 'auto', paddingBottom: '2px' }}>
           {[
-            { id: "ingest", label: "1. Document Ingestion", icon: "📄", color: "sky" },
-            { id: "generate", label: "2. Candidate Generation", icon: "⚡", color: "indigo" },
-            { id: "qa", label: "3. QA & Release Audit", icon: "🛡️", color: "emerald" },
-            { id: "freeze", label: "4. Freeze Dataset", icon: "🔒", color: "purple" },
-            { id: "train", label: "5. QLoRA Training", icon: "🚀", color: "amber" },
-            { id: "sync", label: "6. Drive Export Sync", icon: "☁️", color: "teal" },
+            { id: "ingest", label: "1. Document Ingestion", icon: "📄" },
+            { id: "generate", label: "2. Candidate Generation", icon: "⚡" },
+            { id: "qa", label: "3. QA & Release Audit", icon: "🛡️" },
+            { id: "freeze", label: "4. Freeze Dataset", icon: "🔒" },
+            { id: "train", label: "5. QLoRA Training", icon: "🚀" },
+            { id: "sync", label: "6. Drive Export Sync", icon: "☁️" },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`px-4 py-3 text-xs font-semibold rounded-t-xl transition-all border-t border-x whitespace-nowrap flex items-center space-x-2 ${
-                  isActive
-                    ? "bg-slate-900 border-slate-700 text-sky-300 border-b-transparent shadow-md"
-                    : "bg-transparent border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-900/40"
-                }`}
+                style={{
+                  padding: '12px 18px',
+                  borderRadius: '10px 10px 0 0',
+                  fontSize: '13px',
+                  fontWeight: '700',
+                  border: isActive ? '1px solid #0284c7' : '1px solid transparent',
+                  borderBottom: isActive ? '3px solid #0284c7' : 'none',
+                  background: isActive ? '#0f172a' : 'transparent',
+                  color: isActive ? '#38bdf8' : '#94a3b8',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
               >
                 <span>{tab.icon}</span>
                 <span>{tab.label}</span>
@@ -311,255 +317,260 @@ export default function DatasetFactoryPage() {
           })}
         </div>
 
-        {/* Pipeline Controls Container */}
-        <div className="bg-slate-900/80 backdrop-blur border border-slate-800/90 p-7 rounded-2xl mb-10 shadow-2xl">
+        {/* Pipeline Controls Active Panel */}
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '28px', borderRadius: '16px', marginBottom: '36px' }}>
           {/* TAB 1: INGESTION */}
           {activeTab === "ingest" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-sky-400 mr-2">📄</span> Stage 1: Document Extraction & Normalization
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  📄 Stage 1: Document Extraction & Normalization
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Ingests PDFs, HTML, Markdown, TXT, and JSON/JSONL archives, applies layout parsing, extracts equations & tables, and emits standard chunks.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Input Path or Directory</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Input Path or Directory</label>
                   <input
                     type="text"
                     value={inputPath}
                     onChange={(e) => setInputPath(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Max Document Processing Limit</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Max Document Processing Limit</label>
                   <input
                     type="number"
                     value={maxDocuments}
                     onChange={(e) => setMaxDocuments(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-sky-500"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff' }}
                   />
                 </div>
               </div>
 
-              <div className="flex flex-wrap gap-4 pt-2">
-                <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+              <div style={{ display: 'flex', gap: '24px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={extractEquations}
                     onChange={(e) => setExtractEquations(e.target.checked)}
-                    className="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-sky-500"
                   />
-                  <span>Parse LaTeX Equations</span>
+                  Parse LaTeX Equations
                 </label>
-                <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', cursor: 'pointer' }}>
                   <input
                     type="checkbox"
                     checked={cleanHtml}
                     onChange={(e) => setCleanHtml(e.target.checked)}
-                    className="rounded bg-slate-950 border-slate-800 text-sky-500 focus:ring-sky-500"
                   />
-                  <span>Strip Boilerplate HTML</span>
+                  Strip Boilerplate HTML
                 </label>
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("ingest", {
-                    collection_slug: collectionSlug,
-                    input_path: inputPath,
-                    source: sourceName,
-                    max_documents: maxDocuments,
-                    extract_equations: extractEquations,
-                    clean_html: cleanHtml,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-sky-600 to-cyan-600 hover:from-sky-500 hover:to-cyan-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-sky-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Launching Ingestion..." : "🚀 Launch Document Ingestion Pipeline"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("ingest", {
+                      collection_slug: collectionSlug,
+                      input_path: inputPath,
+                      source: sourceName,
+                      max_documents: maxDocuments,
+                      extract_equations: extractEquations,
+                      clean_html: cleanHtml,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #0284c7 0%, #0891b2 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(2,132,199,0.3)' }}
+                >
+                  {isSubmitting ? "Launching Ingestion..." : "🚀 Launch Document Ingestion Pipeline"}
+                </button>
+              </div>
             </div>
           )}
 
           {/* TAB 2: GENERATION */}
           {activeTab === "generate" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-indigo-400 mr-2">⚡</span> Stage 2: Instruction Candidate Generation
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  ⚡ Stage 2: Instruction Candidate Generation
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Streams chunk embeddings, synthesizes high-quality QA instruction pairs with grounding validation and deduplication filters.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Target Candidate Count</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Target Candidate Count</label>
                   <input
                     type="number"
                     value={candidateCount}
                     onChange={(e) => setCandidateCount(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Random Seed</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Random Seed</label>
                   <input
                     type="number"
                     value={seed}
                     onChange={(e) => setSeed(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff' }}
                   />
                 </div>
 
-                <div className="flex items-end pb-2">
-                  <label className="flex items-center space-x-2 text-xs text-slate-300 cursor-pointer">
+                <div style={{ display: 'flex', alignItems: 'center', paddingTop: '20px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: '#cbd5e1', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={deduplicate}
                       onChange={(e) => setDeduplicate(e.target.checked)}
-                      className="rounded bg-slate-950 border-slate-800 text-indigo-500 focus:ring-indigo-500"
                     />
-                    <span>Enforce MinHash Deduplication</span>
+                    Enforce MinHash Deduplication
                   </label>
                 </div>
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("generate", {
-                    collection_slug: collectionSlug,
-                    candidate_count: candidateCount,
-                    seed,
-                    deduplicate,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-indigo-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Generating Candidates..." : "⚡ Generate Candidate Dataset"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("generate", {
+                      collection_slug: collectionSlug,
+                      candidate_count: candidateCount,
+                      seed,
+                      deduplicate,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(79,70,229,0.3)' }}
+                >
+                  {isSubmitting ? "Generating Candidates..." : "⚡ Generate Candidate Dataset"}
+                </button>
+              </div>
             </div>
           )}
 
           {/* TAB 3: QA AUDIT */}
           {activeTab === "qa" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-emerald-400 mr-2">🛡️</span> Stage 3: Release QA & Rights Audit Engine
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  🛡️ Stage 3: Release QA & Rights Audit Engine
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Runs DatasetReleaseQAEngine to audit grounding overlap, check license compliance, score text quality, and check data leakage.
                 </p>
               </div>
 
-              <div className="p-4 rounded-xl bg-slate-950 border border-slate-800 text-xs text-slate-300 space-y-2">
-                <div className="flex justify-between">
+              <div style={{ background: '#090d16', border: '1px solid #1e293b', padding: '16px', borderRadius: '10px', fontSize: '13px', color: '#cbd5e1' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span>QA Audit Strategy:</span>
-                  <span className="text-emerald-400 font-mono">DatasetReleaseQAEngine (V2.0)</span>
+                  <strong style={{ color: '#34d399' }}>DatasetReleaseQAEngine (V2.0)</strong>
                 </div>
-                <div className="flex justify-between">
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
                   <span>Grounding Gate Threshold:</span>
-                  <span className="text-slate-200 font-mono">≥ 0.85 Overlap Score</span>
+                  <strong>≥ 0.85 Overlap Score</strong>
                 </div>
-                <div className="flex justify-between">
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span>License Filter:</span>
-                  <span className="text-slate-200 font-mono">Permissive Public / Authorized Only</span>
+                  <strong>Permissive Public / Authorized Only</strong>
                 </div>
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("qa", {
-                    collection_slug: collectionSlug,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-emerald-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Running Audit..." : "🛡️ Run Full Quality & Rights Audit"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("qa", {
+                      collection_slug: collectionSlug,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #059669 0%, #0d9488 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(5,150,105,0.3)' }}
+                >
+                  {isSubmitting ? "Running Audit..." : "🛡️ Run Full Quality & Rights Audit"}
+                </button>
+              </div>
             </div>
           )}
 
           {/* TAB 4: FREEZE */}
           {activeTab === "freeze" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-purple-400 mr-2">🔒</span> Stage 4: Freeze & Lock Dataset Release
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  🔒 Stage 4: Freeze & Lock Dataset Release
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Locks dataset version, splits data into Train/Val/Test, computes SHA-256 manifest checksums, and creates FROZEN state marker.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Target Release Version Tag</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Target Release Version Tag</label>
                   <input
                     type="text"
                     value={versionName}
                     onChange={(e) => setVersionName(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Train / Val / Test Split Ratio</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Train / Val / Test Split Ratio</label>
                   <input
                     type="text"
                     value={splitRatio}
                     onChange={(e) => setSplitRatio(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-purple-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("release", {
-                    collection_slug: collectionSlug,
-                    version_name: versionName,
-                    split_ratios: splitRatio,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-purple-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Freezing Dataset..." : "🔒 Lock & Freeze Dataset Version"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("release", {
+                      collection_slug: collectionSlug,
+                      version_name: versionName,
+                      split_ratios: splitRatio,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #9333ea 0%, #c026d3 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(147,51,234,0.3)' }}
+                >
+                  {isSubmitting ? "Freezing Dataset..." : "🔒 Lock & Freeze Dataset Version"}
+                </button>
+              </div>
             </div>
           )}
 
           {/* TAB 5: QLORA TRAINING */}
           {activeTab === "train" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-amber-400 mr-2">🚀</span> Stage 5: QLoRA Fine-Tuning Orchestrator
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  🚀 Stage 5: QLoRA Fine-Tuning Orchestrator
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Runs hardware preflight verification and executes 4-bit quantized QLoRA model fine-tuning on frozen dataset version.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                <div className="md:col-span-3">
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Base Foundation Model</label>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '20px' }}>
+                <div style={{ gridColumn: 'span 3' }}>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Base Foundation Model</label>
                   <select
                     value={baseModel}
                     onChange={(e) => setBaseModel(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontSize: '14px' }}
                   >
                     <option value="Qwen/Qwen3-4B-Base">Qwen/Qwen3-4B-Base (Recommended)</option>
                     <option value="meta-llama/Meta-Llama-3-8B">Meta-Llama-3-8B</option>
@@ -569,160 +580,178 @@ export default function DatasetFactoryPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">LoRA Rank (r)</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>LoRA Rank (r)</label>
                   <input
                     type="number"
                     value={loraR}
                     onChange={(e) => setLoraR(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">LoRA Alpha (α)</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>LoRA Alpha (α)</label>
                   <input
                     type="number"
                     value={loraAlpha}
                     onChange={(e) => setLoraAlpha(Number(e.target.value))}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1.5">Learning Rate</label>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Learning Rate</label>
                   <input
                     type="text"
                     value={learningRate}
                     onChange={(e) => setLearningRate(e.target.value)}
-                    className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-amber-500 font-mono"
+                    style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                   />
                 </div>
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("train", {
-                    collection_slug: collectionSlug,
-                    base_model: baseModel,
-                    lora_r: loraR,
-                    lora_alpha: loraAlpha,
-                    learning_rate: learningRate,
-                    epochs,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-amber-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Launching Training..." : "🚀 Launch QLoRA Fine-Tuning Workload"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("train", {
+                      collection_slug: collectionSlug,
+                      base_model: baseModel,
+                      lora_r: loraR,
+                      lora_alpha: loraAlpha,
+                      learning_rate: learningRate,
+                      epochs,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #d97706 0%, #ea580c 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(217,119,6,0.3)' }}
+                >
+                  {isSubmitting ? "Launching Training..." : "🚀 Launch QLoRA Fine-Tuning Workload"}
+                </button>
+              </div>
             </div>
           )}
 
           {/* TAB 6: GOOGLE DRIVE SYNC */}
           {activeTab === "sync" && (
-            <div className="space-y-6">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
               <div>
-                <h3 className="text-lg font-bold text-slate-100 flex items-center">
-                  <span className="text-teal-400 mr-2">☁️</span> Stage 6: Google Drive Artifact Export Sync
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
+                  ☁️ Stage 6: Google Drive Artifact Export Sync
                 </h3>
-                <p className="text-xs text-slate-400 mt-1">
+                <p style={{ fontSize: '13px', color: '#94a3b8', marginTop: '4px' }}>
                   Synchronizes frozen dataset packages, manifests, and trained adapter weights to authorized Google Drive storage.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1.5">Destination Drive Folder Name</label>
+                <label style={{ display: 'block', fontSize: '12px', color: '#cbd5e1', marginBottom: '6px' }}>Destination Drive Folder Name</label>
                 <input
                   type="text"
                   value={driveFolder}
                   onChange={(e) => setDriveFolder(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3.5 py-2.5 text-sm text-slate-200 focus:outline-none focus:border-teal-500 font-mono"
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace' }}
                 />
               </div>
 
-              <button
-                disabled={isSubmitting}
-                onClick={() =>
-                  handleLaunchPipeline("sync", {
-                    collection_slug: collectionSlug,
-                    destination_folder: driveFolder,
-                  })
-                }
-                className="px-6 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-500 hover:to-emerald-500 text-white rounded-xl font-semibold text-sm transition-all shadow-lg hover:shadow-teal-500/20 disabled:opacity-50"
-              >
-                {isSubmitting ? "Syncing Artifacts..." : "☁️ Export & Sync to Google Drive"}
-              </button>
+              <div>
+                <button
+                  disabled={isSubmitting}
+                  onClick={() =>
+                    handleLaunchPipeline("sync", {
+                      collection_slug: collectionSlug,
+                      destination_folder: driveFolder,
+                    })
+                  }
+                  style={{ background: 'linear-gradient(135deg, #0d9488 0%, #059669 100%)', color: '#fff', padding: '12px 24px', borderRadius: '10px', fontWeight: '700', border: 'none', cursor: 'pointer', fontSize: '14px', boxShadow: '0 4px 14px rgba(13,148,136,0.3)' }}
+                >
+                  {isSubmitting ? "Syncing Artifacts..." : "☁️ Export & Sync to Google Drive"}
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Live Active Pipeline Jobs Feed */}
-        <div className="bg-slate-900/70 backdrop-blur border border-slate-800/90 rounded-2xl p-6 shadow-xl">
-          <div className="flex items-center justify-between mb-5">
+        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '16px', padding: '24px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
-              <h2 className="text-base font-bold text-slate-100 flex items-center">
-                <span className="w-2 h-2 rounded-full bg-sky-400 mr-2"></span>
+              <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#f8fafc', margin: 0 }}>
                 Active & Enqueued Pipeline Tasks
               </h2>
-              <p className="text-xs text-slate-400 mt-0.5">Real-time status updates from Celery worker queue</p>
+              <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>Real-time status updates from Celery worker queue</p>
             </div>
             <button
               onClick={fetchJobs}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors"
+              style={{ background: '#1e293b', border: '1px solid #334155', color: '#cbd5e1', padding: '8px 14px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
             >
               🔄 Refresh List
             </button>
           </div>
 
           {isLoadingJobs ? (
-            <div className="text-xs text-slate-400 py-6 text-center">Loading task queue...</div>
+            <div style={{ fontSize: '13px', color: '#94a3b8', padding: '24px 0', textAlign: 'center' }}>Loading task queue...</div>
           ) : recentJobs.length === 0 ? (
-            <div className="text-xs text-slate-500 py-8 text-center bg-slate-950/40 rounded-xl border border-slate-800/50">
+            <div style={{ fontSize: '13px', color: '#64748b', padding: '32px', textAlign: 'center', background: '#090d16', borderRadius: '10px', border: '1px solid #1e293b' }}>
               No tasks currently queued. Select a stage above and click Launch to start a pipeline workload.
             </div>
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {recentJobs.slice(0, 5).map((job) => (
                 <div
                   key={job.id}
-                  className="bg-slate-950/80 border border-slate-800/80 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
+                  style={{
+                    background: '#090d16',
+                    border: '1px solid #1e293b',
+                    borderRadius: '12px',
+                    padding: '16px',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    flexWrap: 'wrap',
+                    gap: '12px'
+                  }}
                 >
-                  <div className="space-y-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold text-sm text-slate-100">{job.name}</span>
-                      <span className="text-xs font-mono text-slate-500">({job.job_type})</span>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '14px', fontWeight: '700', color: '#f8fafc' }}>{job.name}</span>
+                      <span style={{ fontSize: '11px', fontFamily: 'monospace', color: '#64748b' }}>({job.job_type})</span>
                     </div>
-                    <div className="text-xs text-slate-400">
-                      Stage: <span className="text-sky-300 font-mono">{job.current_stage || job.status}</span> •{" "}
+                    <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
+                      Stage: <span style={{ color: '#38bdf8', fontFamily: 'monospace' }}>{job.current_stage || job.status}</span> •{" "}
                       {job.progress_message || "In execution queue"}
                     </div>
                   </div>
 
-                  <div className="flex items-center space-x-4">
-                    <div className="w-32 bg-slate-800 rounded-full h-2 overflow-hidden">
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                    <div style={{ width: '120px', background: '#1e293b', borderRadius: '10px', height: '8px', overflow: 'hidden' }}>
                       <div
-                        className="bg-gradient-to-r from-sky-400 to-teal-400 h-full transition-all duration-500"
-                        style={{ width: `${job.progress_percentage || 0}%` }}
+                        style={{
+                          background: 'linear-gradient(to right, #38bdf8, #2dd4bf)',
+                          height: '100%',
+                          width: `${job.progress_percentage || 0}%`,
+                          transition: 'width 0.3s ease'
+                        }}
                       ></div>
                     </div>
 
                     <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-semibold font-mono ${
-                        job.status === "succeeded"
-                          ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
-                          : job.status === "running" || job.status === "leased"
-                          ? "bg-sky-500/10 text-sky-400 border border-sky-500/20"
-                          : job.status === "failed"
-                          ? "bg-rose-500/10 text-rose-400 border border-rose-500/20"
-                          : "bg-slate-800 text-slate-300"
-                      }`}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '20px',
+                        fontSize: '11px',
+                        fontWeight: '700',
+                        fontFamily: 'monospace',
+                        background: job.status === 'succeeded' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(2, 132, 199, 0.15)',
+                        color: job.status === 'succeeded' ? '#34d399' : '#38bdf8',
+                        border: job.status === 'succeeded' ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(2, 132, 199, 0.3)'
+                      }}
                     >
                       {job.status.toUpperCase()} ({job.progress_percentage || 0}%)
                     </span>
 
                     <Link
                       href={`/dashboard/jobs/${job.id}`}
-                      className="text-xs text-sky-400 hover:text-sky-300 font-semibold underline"
+                      style={{ fontSize: '12px', color: '#38bdf8', fontWeight: '600', textDecoration: 'underline' }}
                     >
                       Details
                     </Link>
