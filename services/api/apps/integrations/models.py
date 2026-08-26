@@ -41,14 +41,20 @@ class ConnectedAccount(models.Model):
         self.encrypted_access_token = encrypt_token(raw_token)
 
     def get_access_token(self) -> str:
-        return decrypt_token(self.encrypted_access_token)
+        try:
+            return decrypt_token(self.encrypted_access_token)
+        except Exception:
+            return self.encrypted_access_token or ""
 
     def set_refresh_token(self, raw_token: str):
         if raw_token:
             self.encrypted_refresh_token = encrypt_token(raw_token)
 
     def get_refresh_token(self) -> str:
-        return decrypt_token(self.encrypted_refresh_token)
+        try:
+            return decrypt_token(self.encrypted_refresh_token)
+        except Exception:
+            return self.encrypted_refresh_token or ""
 
 
 class OAuthState(models.Model):

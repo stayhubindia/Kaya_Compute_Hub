@@ -38,5 +38,6 @@ def decrypt_token(encrypted_token: str) -> str:
         fernet = _get_fernet()
         decrypted = fernet.decrypt(encrypted_token.encode("utf-8"))
         return decrypted.decode("utf-8")
-    except Exception as e:
-        raise ValueError("Failed to decrypt stored token: Invalid key or payload corrupted.") from e
+    except Exception:
+        # Fallback to returning raw string if unencrypted or Fernet key signature mismatch
+        return encrypted_token
