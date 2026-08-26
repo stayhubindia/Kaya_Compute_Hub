@@ -40,10 +40,15 @@ class TerminalCommandView(APIView):
             if not os.path.exists(cwd):
                 cwd = "/tmp"
 
-            env = os.environ.copy()
-            venv_bin = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.venv/bin"))
-            if os.path.exists(venv_bin):
-                env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
+            possible_venvs = [
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.venv/bin")),
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.venv/bin")),
+                os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.venv/bin")),
+            ]
+            for venv_bin in possible_venvs:
+                if os.path.exists(venv_bin):
+                    env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
+                    break
 
             res = subprocess.run(
                 command,

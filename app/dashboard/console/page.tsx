@@ -72,6 +72,30 @@ else:
             
     print(f"\n[SUMMARY] Total Files: {total_files} | Total Storage Used: {total_size / (1024*1024):.2f} MB")
 `
+  },
+  colab_remote_exec: {
+    name: 'Remote Colab Session Executor (via colab-cli)',
+    code: `import subprocess
+
+# Dispatch Python code to run inside active Google Colab GPU Container
+code_to_run = """import os
+import sys
+
+print("[COLAB CONTAINER] Running in Google Colab Session!")
+print(f"Python Version: {sys.version}")
+print(f"Current Directory: {os.getcwd()}")
+"""
+
+try:
+    res = subprocess.run(["colab", "exec"], input=code_to_run, text=True, capture_output=True, timeout=30)
+    print("=== Colab Remote Output ===")
+    print(res.stdout)
+    if res.stderr:
+        print("=== Colab Stderr ===")
+        print(res.stderr)
+except Exception as e:
+    print(f"[ERROR] Execution failed: {e}")
+`
   }
 };
 
@@ -398,6 +422,7 @@ export default function ConsolePage() {
                 <option value="arxiv_test">ArXiv Downloader Test Script</option>
                 <option value="pytorch_check">PyTorch & CUDA Diagnostics</option>
                 <option value="drive_inspector">Google Drive Dataset Inspector</option>
+                <option value="colab_remote_exec">Remote Colab Session Executor (colab exec)</option>
               </select>
             </div>
           </div>
