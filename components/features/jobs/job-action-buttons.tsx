@@ -14,7 +14,7 @@ export const JobActionButtons: React.FC<JobActionButtonsProps> = ({ jobId, statu
   const [confirmCancel, setConfirmCancel] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
-  const s = status.toLowerCase();
+  const s = (status || '').toLowerCase();
 
   const handleAction = async (action: 'cancel' | 'pause' | 'resume' | 'retry') => {
     try {

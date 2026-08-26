@@ -41,20 +41,22 @@ export const ArtifactListTable: React.FC<ArtifactListTableProps> = ({ artifacts 
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-800/60">
-          {artifacts.map((art) => (
-            <tr key={art.id} className="hover:bg-slate-800/40 transition-colors">
-              <td className="p-3 font-semibold text-slate-100">{art.name}</td>
-              <td className="p-3 uppercase text-[10px] font-mono text-cyan-400">{art.artifact_type}</td>
-              <td className="p-3 font-mono">{formatSize(art.size_bytes)}</td>
-              <td className="p-3 font-mono text-slate-400 truncate max-w-[120px]">{art.checksum ? art.checksum.substring(0, 12) + '...' : 'N/A'}</td>
-              <td className="p-3 text-slate-400">{new Date(art.created_at).toLocaleString()}</td>
+          {(artifacts || []).map((art, idx) => (
+            <tr key={art?.id || idx} className="hover:bg-slate-800/40 transition-colors">
+              <td className="p-3 font-semibold text-slate-100">{art?.name || 'Unnamed Artifact'}</td>
+              <td className="p-3 uppercase text-[10px] font-mono text-cyan-400">{art?.artifact_type || 'file'}</td>
+              <td className="p-3 font-mono">{formatSize(art?.size_bytes || 0)}</td>
+              <td className="p-3 font-mono text-slate-400 truncate max-w-[120px]">{art?.checksum ? art.checksum.substring(0, 12) + '...' : 'N/A'}</td>
+              <td className="p-3 text-slate-400">{art?.created_at ? new Date(art.created_at).toLocaleString() : '--'}</td>
               <td className="p-3 text-right">
-                <button
-                  onClick={() => handleDownload(art)}
-                  className="px-3 py-1 text-xs font-semibold rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 transition-colors"
-                >
-                  ⬇️ Download
-                </button>
+                {art?.id && (
+                  <button
+                    onClick={() => handleDownload(art)}
+                    className="px-3 py-1 text-xs font-semibold rounded bg-cyan-950 hover:bg-cyan-900 border border-cyan-800 text-cyan-300 transition-colors"
+                  >
+                    ⬇️ Download
+                  </button>
+                )}
               </td>
             </tr>
           ))}

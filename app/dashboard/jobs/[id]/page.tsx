@@ -142,7 +142,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               cursor: 'pointer'
             }}
           >
-            🖥️ Terminal Logs ({logs.length})
+            🖥️ Terminal Logs ({logs?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('metrics')}
@@ -157,7 +157,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               cursor: 'pointer'
             }}
           >
-            📊 Training Metrics ({metrics.length})
+            📊 Training Metrics ({metrics?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab('artifacts')}
@@ -172,7 +172,7 @@ export default function JobDetailPage({ params }: { params: Promise<{ id: string
               cursor: 'pointer'
             }}
           >
-            📦 Artifacts ({artifacts.length})
+            📦 Artifacts ({artifacts?.length || 0})
           </button>
         </div>
 

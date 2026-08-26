@@ -5,7 +5,8 @@ interface StatusBadgeProps {
 }
 
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
-  const s = status.toLowerCase();
+  const safeStatus = status || 'unknown';
+  const s = safeStatus.toLowerCase();
 
   let colorClasses = 'bg-gray-800 text-gray-300 border-gray-700';
 
@@ -24,7 +25,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status }) => {
   return (
     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${colorClasses}`}>
       <span className="w-1.5 h-1.5 mr-1.5 rounded-full bg-current" />
-      {status.toUpperCase()}
+      {safeStatus.toUpperCase()}
     </span>
   );
 };

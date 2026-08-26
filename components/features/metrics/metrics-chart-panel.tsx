@@ -24,13 +24,14 @@ export const MetricsChartPanel: React.FC<MetricsChartPanelProps> = ({
 
   // Group metrics by name
   const metricsByName: Record<string, TrainingMetric[]> = {};
-  metrics.forEach((m) => {
+  (metrics || []).forEach((m) => {
+    if (!m || !m.name) return;
     if (!metricsByName[m.name]) metricsByName[m.name] = [];
     metricsByName[m.name].push(m);
   });
 
   const renderSimpleChart = (metricName: string, data: TrainingMetric[], color: string) => {
-    if (data.length < 2) {
+    if (!data || data.length < 2) {
       return (
         <div className="h-32 flex items-center justify-center text-xs text-slate-500">
           Insufficient data points for trend chart.
@@ -38,7 +39,7 @@ export const MetricsChartPanel: React.FC<MetricsChartPanelProps> = ({
       );
     }
 
-    const values = data.map((d) => d.value);
+    const values = data.map((d) => (typeof d?.value === 'number' ? d.value : 0));
     const minVal = Math.min(...values);
     const maxVal = Math.max(...values);
     const range = maxVal - minVal || 1;
@@ -48,12 +49,13 @@ export const MetricsChartPanel: React.FC<MetricsChartPanelProps> = ({
     const padding = 15;
 
     const points = data.map((d, index) => {
+      const val = typeof d?.value === 'number' ? d.value : 0;
       const x = padding + (index / (data.length - 1)) * (width - 2 * padding);
-      const y = height - padding - ((d.value - minVal) / range) * (height - 2 * padding);
+      const y = height - padding - ((val - minVal) / range) * (height - 2 * padding);
       return `${x},${y}`;
     }).join(' ');
 
-    const lastVal = data[data.length - 1].value;
+    const lastVal = typeof data[data.length - 1]?.value === 'number' ? data[data.length - 1].value : 0;
 
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col space-y-2">

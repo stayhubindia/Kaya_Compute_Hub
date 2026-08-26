@@ -21,9 +21,14 @@ export const TerminalLogViewer: React.FC<TerminalLogViewerProps> = ({
   const [autoScroll, setAutoScroll] = useState<boolean>(true);
   const logEndRef = useRef<HTMLDivElement>(null);
 
-  const filteredLogs = logs.filter((log) => {
-    if (levelFilter !== 'all' && log.level.toLowerCase() !== levelFilter) return false;
-    if (searchQuery && !log.message.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+  const safeLogs = Array.isArray(logs) ? logs : [];
+
+  const filteredLogs = safeLogs.filter((log) => {
+    if (!log) return false;
+    const lvl = (log.level || 'info').toLowerCase();
+    const msg = (log.message || '').toLowerCase();
+    if (levelFilter !== 'all' && lvl !== levelFilter) return false;
+    if (searchQuery && !msg.includes(searchQuery.toLowerCase())) return false;
     return true;
   });
 
@@ -33,8 +38,8 @@ export const TerminalLogViewer: React.FC<TerminalLogViewerProps> = ({
     }
   }, [filteredLogs, autoScroll]);
 
-  const getLevelColor = (level: string) => {
-    switch (level.toLowerCase()) {
+  const getLevelColor = (level?: string) => {
+    switch ((level || 'info').toLowerCase()) {
       case 'error': return 'text-rose-400 font-semibold';
       case 'warning': return 'text-amber-300';
       case 'debug': return 'text-slate-400';
@@ -114,14 +119,14 @@ export const TerminalLogViewer: React.FC<TerminalLogViewerProps> = ({
             {loading ? 'Fetching logs...' : 'No logs recorded for this execution.'}
           </div>
         ) : (
-          filteredLogs.map((log) => (
-            <div key={log.id} className="flex items-start space-x-2 leading-relaxed hover:bg-slate-900/60 rounded px-1 -mx-1">
-              <span className="text-slate-500 shrink-0">[{new Date(log.timestamp).toLocaleTimeString()}]</span>
+          filteredLogs.map((log, idx) => (
+            <div key={log.id || idx} className="flex items-start space-x-2 leading-relaxed hover:bg-slate-900/60 rounded px-1 -mx-1">
+              <span className="text-slate-500 shrink-0">[{log.timestamp ? new Date(log.timestamp).toLocaleTimeString() : '--:--:--'}]</span>
               <span className={`shrink-0 uppercase text-[10px] px-1 py-0.2 rounded bg-slate-900 border border-slate-800 ${getLevelColor(log.level)}`}>
-                {log.level}
+                {log.level || 'INFO'}
               </span>
-              <span className="text-slate-400 shrink-0">[{log.module}]:</span>
-              <span className="text-slate-200 break-all">{log.message}</span>
+              <span className="text-slate-400 shrink-0">[{log.module || 'system'}]:</span>
+              <span className="text-slate-200 break-all">{log.message || ''}</span>
             </div>
           ))
         )}
