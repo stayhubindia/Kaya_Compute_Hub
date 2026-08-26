@@ -1,10 +1,22 @@
 import os
+import sys
 import uuid
 import json
 import shutil
 import subprocess
 from pathlib import Path
 from datetime import timedelta
+
+
+def _get_colab_bin() -> str:
+    py_bin_dir = Path(sys.executable).parent
+    venv_colab = py_bin_dir / "colab"
+    if venv_colab.exists():
+        return str(venv_colab)
+    which_colab = shutil.which("colab")
+    if which_colab:
+        return which_colab
+    return "colab"
 from django.utils import timezone
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
@@ -640,8 +652,7 @@ def colab_session_create(request):
         except Exception:
             pass
 
-    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
-    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+    colab_bin = _get_colab_bin()
 
     # Stop orphan local assignment first
     subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
@@ -701,8 +712,7 @@ def colab_session_create(request):
 @permission_classes([permissions.IsAuthenticated])
 def colab_sessions_list(request):
     """List active Google Colab VM sessions."""
-    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
-    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+    colab_bin = _get_colab_bin()
 
     try:
         proc = subprocess.run([colab_bin, "sessions"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
@@ -725,8 +735,7 @@ def colab_session_stop(request):
     if not session_name:
         return Response({"error": {"message": "session_name is required."}}, status=status.HTTP_400_BAD_REQUEST)
 
-    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
-    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+    colab_bin = _get_colab_bin()
 
     try:
         proc = subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
