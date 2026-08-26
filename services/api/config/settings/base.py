@@ -18,8 +18,9 @@ try:
 except ImportError:
     pass
 
-SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or secrets.token_urlsafe(64)
-TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY') or secrets.token_urlsafe(64)
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or 'django-insecure-kaya-compute-hub-persistent-stable-secret-key-2026'
+TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY') or 'totp-encryption-kaya-compute-hub-persistent-stable-key-2026'
+SESSION_ENGINE = 'django.contrib.sessions.backends.db'
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
