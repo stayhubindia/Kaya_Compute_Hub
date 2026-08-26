@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, use } from 'react';
+import React, { useEffect, useState } from 'react';
 import DashboardNavbar from '@/components/DashboardNavbar';
 import { User, authClient } from '@/lib/api/authClient';
 import { api } from '@/lib/api/client';
@@ -12,9 +12,8 @@ import { ArtifactListTable } from '@/components/features/artifacts/artifact-list
 import { useJobLogs } from '@/lib/hooks/use-job-logs';
 import { useJobEvents } from '@/lib/hooks/use-job-events';
 
-export default function JobDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const resolvedParams = use(params);
-  const jobId = resolvedParams.id;
+export default function JobDetailPage({ params }: { params: { id: string } }) {
+  const jobId = params?.id;
 
   const [user, setUser] = useState<User | null>(null);
   const [job, setJob] = useState<any>(null);
