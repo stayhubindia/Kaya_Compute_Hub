@@ -112,6 +112,22 @@ export default function ConsolePage() {
   const [colabAuthUrl, setColabAuthUrl] = useState<string | null>(null);
   const [authCodeInput, setAuthCodeInput] = useState('');
 
+  // Interactive Colab REPL State
+  const [replInput, setReplInput] = useState('');
+  const [replCount, setReplCount] = useState(1);
+  const [replHistory, setReplHistory] = useState<Array<{ count: number; code: string; stdout: string; stderr: string; time: string }>>([
+    { count: 1, code: 'import os\nprint("[COLAB KERNEL READY] Connected to active Google Colab session!")', stdout: '[COLAB KERNEL READY] Connected to active Google Colab session!\n', stderr: '', time: new Date().toLocaleTimeString() }
+  ]);
+  const [isExecutingRepl, setIsExecutingRepl] = useState(false);
+  const replEndRef = useRef<HTMLDivElement>(null);
+
+  // Active Console View Mode: 'repl' | 'terminal' | 'runner'
+  const [activeTab, setActiveTab] = useState<'repl' | 'terminal' | 'runner'>('repl');
+
+  useEffect(() => {
+    replEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [replHistory]);
+
   // Code Runner State
   const [selectedTemplate, setSelectedTemplate] = useState('arxiv_test');
   const [scriptName, setScriptName] = useState('ArXiv Test Script');
@@ -122,6 +138,38 @@ export default function ConsolePage() {
   const [codeOutput, setCodeOutput] = useState<{ status?: string; stdout?: string; stderr?: string; execution_time?: string; job_id?: string; message?: string } | null>(null);
 
   const terminalEndRef = useRef<HTMLDivElement>(null);
+
+  const handleRunColabRepl = async (codeToRun?: string) => {
+    const code = (codeToRun || replInput).trim();
+    if (!code) return;
+
+    const currentCount = replCount;
+    setReplCount(prev => prev + 1);
+    if (!codeToRun) setReplInput('');
+    setIsExecutingRepl(true);
+
+    try {
+      const data: any = await api.post('/console/terminal/', {
+        command: 'colab exec',
+        stdin_input: code + '\n'
+      });
+
+      const stdout = data.stdout || '';
+      const stderr = data.stderr || '';
+
+      setReplHistory(prev => [
+        ...prev,
+        { count: currentCount + 1, code, stdout, stderr, time: new Date().toLocaleTimeString() }
+      ]);
+    } catch (err: any) {
+      setReplHistory(prev => [
+        ...prev,
+        { count: currentCount + 1, code, stdout: '', stderr: err.message || 'Kernel execution error', time: new Date().toLocaleTimeString() }
+      ]);
+    } finally {
+      setIsExecutingRepl(false);
+    }
+  };
 
   useEffect(() => {
     async function loadUser() {
@@ -269,8 +317,224 @@ export default function ConsolePage() {
           </div>
         </div>
 
-        {/* Section 1: Colab Interactive Web Terminal */}
-        <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', marginBottom: '24px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
+        {/* Navigation Tabs Bar */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', borderBottom: '1px solid #1e293b', paddingBottom: '12px' }}>
+          <button
+            onClick={() => setActiveTab('repl')}
+            style={{
+              background: activeTab === 'repl' ? 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)' : '#0f172a',
+              color: '#fff',
+              border: activeTab === 'repl' ? '1px solid #38bdf8' : '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontWeight: '700',
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: activeTab === 'repl' ? '0 4px 12px rgba(56,189,248,0.25)' : 'none'
+            }}
+          >
+            <span>🐍 Interactive Colab REPL</span>
+            <span style={{ fontSize: '10px', background: '#0284c7', color: '#fff', padding: '2px 6px', borderRadius: '10px' }}>Stateful</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('terminal')}
+            style={{
+              background: activeTab === 'terminal' ? 'linear-gradient(135deg, #4c1d95 0%, #581c87 100%)' : '#0f172a',
+              color: '#fff',
+              border: activeTab === 'terminal' ? '1px solid #c084fc' : '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontWeight: '700',
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: activeTab === 'terminal' ? '0 4px 12px rgba(192,132,252,0.25)' : 'none'
+            }}
+          >
+            <span>🖥️ Colab Terminal Console</span>
+            <span style={{ fontSize: '10px', background: '#6b21a8', color: '#fff', padding: '2px 6px', borderRadius: '10px' }}>Bash Shell</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('runner')}
+            style={{
+              background: activeTab === 'runner' ? 'linear-gradient(135deg, #059669 0%, #047857 100%)' : '#0f172a',
+              color: '#fff',
+              border: activeTab === 'runner' ? '1px solid #34d399' : '1px solid #1e293b',
+              borderRadius: '8px',
+              padding: '10px 18px',
+              fontWeight: '700',
+              fontSize: '14px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              boxShadow: activeTab === 'runner' ? '0 4px 12px rgba(52,211,153,0.25)' : 'none'
+            }}
+          >
+            <span>⚡ Script Sandbox & Jobs</span>
+            <span style={{ fontSize: '10px', background: '#047857', color: '#fff', padding: '2px 6px', borderRadius: '10px' }}>Async Jobs</span>
+          </button>
+        </div>
+
+        {/* TAB 1: INTERACTIVE COLAB REPL (JUPYTER CELL STYLE) */}
+        {activeTab === 'repl' && (
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', marginBottom: '24px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '16px', fontWeight: '700', color: '#38bdf8' }}>
+                  🐍 Interactive Colab Kernel REPL
+                </span>
+                <span style={{ fontSize: '11px', background: '#064e3b', color: '#34d399', padding: '2px 8px', borderRadius: '12px', border: '1px solid #059669' }}>
+                  ● Active Session Kernel Memory Preserved
+                </span>
+              </div>
+
+              {/* REPL Quick Snippet Actions */}
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => handleRunColabRepl("import torch\nprint('CUDA Available:', torch.cuda.is_available())\nif torch.cuda.is_available(): print('GPU Device:', torch.cuda.get_device_name(0))")}
+                  style={{ background: '#1e293b', color: '#38bdf8', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  ⚡ Check GPU
+                </button>
+                <button
+                  onClick={() => handleRunColabRepl("from google.colab import drive\ndrive.mount('/content/drive')")}
+                  style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  📁 Mount Drive
+                </button>
+                <button
+                  onClick={() => handleRunColabRepl("import os\nprint('Current Dir:', os.getcwd())\nprint('Content Files:', os.listdir('/content'))")}
+                  style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  📂 List Files
+                </button>
+                <button
+                  onClick={() => handleRunColabRepl("import psutil\nprint(f'RAM Usage: {psutil.virtual_memory().percent}% | Total: {psutil.virtual_memory().total / (1024**3):.2f} GB')")}
+                  style={{ background: '#1e293b', color: '#a78bfa', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  📊 RAM & Disk
+                </button>
+                <button
+                  onClick={() => setReplHistory([])}
+                  style={{ background: '#334155', color: '#cbd5e1', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}
+                >
+                  🧹 Clear REPL
+                </button>
+              </div>
+            </div>
+
+            {/* REPL History Feed (Jupyter Notebook Cell Style) */}
+            <div style={{ background: '#020617', border: '1px solid #1e293b', borderRadius: '8px', padding: '16px', fontFamily: 'monospace', fontSize: '13px', minHeight: '320px', maxHeight: '480px', overflowY: 'auto', marginBottom: '16px' }}>
+              {replHistory.map((item, idx) => (
+                <div key={idx} style={{ marginBottom: '16px', borderBottom: '1px solid #0f172a', paddingBottom: '12px' }}>
+                  {/* Cell Input */}
+                  <div style={{ display: 'flex', gap: '12px', marginBottom: '6px', alignItems: 'flex-start' }}>
+                    <span style={{ color: '#38bdf8', fontWeight: '700', minWidth: '70px', userSelect: 'none' }}>
+                      In [{item.count}]:
+                    </span>
+                    <pre style={{ margin: 0, color: '#f8fafc', background: '#0f172a', border: '1px solid #1e293b', borderRadius: '6px', padding: '8px 12px', flex: 1, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                      {item.code}
+                    </pre>
+                  </div>
+
+                  {/* Cell Output */}
+                  {(item.stdout || item.stderr) && (
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+                      <span style={{ color: '#34d399', fontWeight: '700', minWidth: '70px', userSelect: 'none' }}>
+                        Out [{item.count}]:
+                      </span>
+                      <div style={{ flex: 1 }}>
+                        {item.stdout && (
+                          <pre style={{ margin: '0 0 4px 0', color: '#e2e8f0', background: '#020617', padding: '6px 10px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {item.stdout}
+                          </pre>
+                        )}
+                        {item.stderr && (
+                          <pre style={{ margin: 0, color: '#fca5a5', background: '#451a1a', padding: '6px 10px', borderRadius: '4px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+                            {item.stderr}
+                          </pre>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {isExecutingRepl && (
+                <div style={{ display: 'flex', gap: '12px', color: '#38bdf8', fontStyle: 'italic' }}>
+                  <span style={{ fontWeight: '700', minWidth: '70px' }}>In [*]:</span>
+                  <span>Executing code in Colab Kernel...</span>
+                </div>
+              )}
+              <div ref={replEndRef} />
+            </div>
+
+            {/* Interactive Cell Form Input */}
+            <form onSubmit={(e) => { e.preventDefault(); handleRunColabRepl(); }}>
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <span style={{ color: '#38bdf8', fontWeight: '700', fontSize: '14px', fontFamily: 'monospace' }}>
+                  In [{replCount}]:
+                </span>
+                <textarea
+                  value={replInput}
+                  onChange={(e) => setReplInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.shiftKey || e.ctrlKey)) {
+                      e.preventDefault();
+                      handleRunColabRepl();
+                    }
+                  }}
+                  placeholder="Enter Python code... (Press Shift+Enter or click Run Cell)"
+                  rows={2}
+                  style={{
+                    flex: 1,
+                    background: '#020617',
+                    border: '1px solid #334155',
+                    borderRadius: '6px',
+                    padding: '10px 14px',
+                    color: '#fff',
+                    fontFamily: 'Consolas, Monaco, monospace',
+                    fontSize: '14px',
+                    resize: 'vertical'
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={isExecutingRepl}
+                  style={{
+                    background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '0 24px',
+                    height: '52px',
+                    fontWeight: '700',
+                    fontSize: '14px',
+                    cursor: isExecutingRepl ? 'not-allowed' : 'pointer',
+                    boxShadow: '0 4px 12px rgba(2,132,199,0.3)'
+                  }}
+                >
+                  {isExecutingRepl ? 'Running...' : '▶ Run Cell'}
+                </button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '6px', fontSize: '12px', color: '#64748b' }}>
+                <span>💡 Tip: Variables and imports remain alive in active Colab memory across cell executions.</span>
+                <span>Shortcut: Shift + Enter</span>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* TAB 2: COLAB TERMINAL CONSOLE (BASH SHELL) */}
+        {activeTab === 'terminal' && (
+          <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', marginBottom: '24px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <span style={{ fontSize: '16px', fontWeight: '700', color: '#f1f5f9' }}>
@@ -390,8 +654,10 @@ export default function ConsolePage() {
             </button>
           </form>
         </div>
+        )}
 
         {/* Section 2: Code Execution Sandbox & Script Runner */}
+        {activeTab === 'runner' && (
         <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '24px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
             <div>
@@ -580,6 +846,7 @@ export default function ConsolePage() {
             </div>
           )}
         </div>
+        )}
       </main>
     </div>
   );
