@@ -13,6 +13,7 @@ class JobTypeChoices(models.TextChoices):
     TRAINING_QLORA = 'train_qlora', 'Train QLoRA'
     EVALUATION = 'evaluate_model', 'Evaluate Model'
     SYNC_DRIVE = 'sync_to_drive', 'Sync to Drive'
+    CUSTOM_SCRIPT = 'custom_script', 'Custom Script'
 
 class JobStatusChoices(models.TextChoices):
     DRAFT = 'draft', 'Draft'
