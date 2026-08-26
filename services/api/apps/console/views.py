@@ -14,11 +14,18 @@ from django.utils.decorators import method_decorator
 from apps.jobs.models import Job, JobStatusChoices
 from services.worker.tasks.job_tasks import execute_job
 
+from rest_framework.authentication import SessionAuthentication
+
+class CsrfExemptSessionAuthentication(SessionAuthentication):
+    def enforce_csrf(self, request):
+        return  # Disable CSRF check for console executions
+
 logger = logging.getLogger(__name__)
 
 
 @method_decorator(csrf_exempt, name='dispatch')
 class TerminalCommandView(APIView):
+    authentication_classes = (CsrfExemptSessionAuthentication,)
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -62,6 +69,7 @@ class TerminalCommandView(APIView):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class CodeExecuteView(APIView):
+    authentication_classes = (CsrfExemptSessionAuthentication,)
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
