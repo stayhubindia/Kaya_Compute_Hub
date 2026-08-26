@@ -70,9 +70,15 @@ MIDDLEWARE = [
 ]
 
 # CORS & CSRF Trusted Origins Configuration
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]
+
+# Reverse Proxy & SSL Headers
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
 
 # Session & Cookie Security Controls
 SESSION_COOKIE_HTTPONLY = True

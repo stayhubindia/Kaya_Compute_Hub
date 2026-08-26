@@ -45,11 +45,11 @@ export async function apiClient<T>(
   try {
     const response = await fetch(url, requestOptions);
 
-    if (response.status === 401) {
+    if (response.status === 401 || response.status === 403) {
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login?expired=true';
       }
-      const errorJson = await response.json().catch(() => ({ error: { status_code: 401, message: 'Authentication required' } }));
+      const errorJson = await response.json().catch(() => ({ error: { status_code: response.status, message: 'Authentication required' } }));
       throw new Error(errorJson.error?.message || 'Authentication credentials were not provided.');
     }
 
