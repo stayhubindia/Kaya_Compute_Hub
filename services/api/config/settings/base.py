@@ -23,7 +23,7 @@ TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY') or secrets.token_url
 
 DEBUG = os.environ.get('DJANGO_DEBUG', 'True').lower() in ('true', '1', 'yes')
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,kaya.stayhubindia.com').split(',') if h.strip()]
 
 # Custom User Model
 AUTH_USER_MODEL = 'accounts.User'
@@ -71,8 +71,8 @@ MIDDLEWARE = [
 
 # CORS & CSRF Trusted Origins Configuration
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if o.strip()]
-CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000').split(',') if o.strip()]
+CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]
 
 # Session & Cookie Security Controls
 SESSION_COOKIE_HTTPONLY = True

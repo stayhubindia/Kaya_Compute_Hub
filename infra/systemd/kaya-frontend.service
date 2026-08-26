@@ -1,0 +1,22 @@
+[Unit]
+Description=Kaya Compute Hub Next.js Frontend UI (Port 3000, Localhost Only)
+After=network.target kaya-api.service
+
+[Service]
+Type=simple
+User=durgesh
+WorkingDirectory=/home/Project/Kaya_Compute_Hub
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+Environment="HOSTNAME=127.0.0.1"
+ExecStart=/usr/bin/npm run start
+Restart=always
+RestartSec=5s
+
+# Low-resource systemd limits (2GB RAM VM protection)
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=50
+
+[Install]
+WantedBy=multi-user.target
