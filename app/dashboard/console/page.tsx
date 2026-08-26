@@ -417,7 +417,7 @@ export default function ConsolePage() {
                   ⚡ Check GPU
                 </button>
                 <button
-                  onClick={() => handleRunColabRepl("from google.colab import drive\ndrive.mount('/content/drive')")}
+                  onClick={() => handleRunCommand('colab drivemount')}
                   style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   📁 Mount Drive
@@ -433,6 +433,12 @@ export default function ConsolePage() {
                   style={{ background: '#1e293b', color: '#a78bfa', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   📊 RAM & Disk
+                </button>
+                <button
+                  onClick={() => handleRunCommand('colab restart-kernel')}
+                  style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  🔄 Restart Kernel
                 </button>
                 <button
                   onClick={() => setReplHistory([])}
@@ -585,8 +591,11 @@ export default function ConsolePage() {
               <button onClick={() => handleRunCommand('nvidia-smi')} style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 GPU Status
               </button>
-              <button onClick={() => handleRunCommand('ls -la')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
-                List Files
+              <button onClick={() => handleRunCommand('colab drivemount')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                📁 Mount Drive
+              </button>
+              <button onClick={() => handleRunCommand('colab restart-kernel')} style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                🔄 Restart Kernel
               </button>
               <button onClick={() => handleRunCommand('clear')} style={{ background: '#334155', color: '#cbd5e1', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 Clear Log
