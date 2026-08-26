@@ -13,8 +13,7 @@ from typing import Any, Callable, Dict, Optional
 from services.pipeline_core.storage.manager import FolderContractManager, compute_sha256, atomic_write_json
 from services.pipeline_core.ingestion.pipeline import KnowledgeIngestionPipeline
 from services.pipeline_core.generation.pipeline import ScientificGenerationPipeline as SyntheticGenerationPipeline
-from services.pipeline_core.dataset.release_qa import ReleaseQualityAuditor
-from services.pipeline_core.dataset.production import DatasetFreezeManager
+from services.pipeline_core.dataset.release_qa import DatasetReleaseQAEngine
 
 logger = logging.getLogger(__name__)
 
@@ -109,16 +108,17 @@ def execute_run_quality_audit(payload: Dict[str, Any], update_cb: Callable[[int,
     out_dir = dirs["60_qa"]
     update_cb(20, "auditing", "Running release quality auditor & rights checks...")
 
-    auditor = ReleaseQualityAuditor(output_dir=out_dir)
-    report = auditor.run_full_audit(candidates_path)
+    engine = DatasetReleaseQAEngine()
+    report, _, _, _ = engine.run_qa_pipeline(input_source=candidates_path, output_dir=out_dir)
 
     update_cb(100, "succeeded", "Quality audit complete.")
+    report_dict = report.to_dict()
     return {
         "status": "success",
         "collection_slug": collection_slug,
-        "overall_score": report.get("overall_score", 0.0),
-        "is_release_ready": report.get("is_release_ready", False),
-        "report_path": str(out_dir / "quality_report.json"),
+        "overall_score": report_dict.get("rights_audit", {}).get("releasable_count", 0),
+        "is_release_ready": report_dict.get("all_mandatory_gates_passed", False),
+        "report_path": str(out_dir / "reports" / "dataset_v2_qa.json"),
     }
 
 
@@ -128,22 +128,27 @@ def execute_freeze_dataset(payload: Dict[str, Any], update_cb: Callable[[int, st
     dirs = contract.initialize_collection(collection_slug)
 
     target_dir = dirs["70_training_ready"]
+    candidates_path = dirs["50_generated"] / "candidates.jsonl"
+    if not candidates_path.exists():
+        candidates_path = dirs["50_generated"]
+
     update_cb(30, "freezing", "Locking dataset version and calculating SHA-256 manifests...")
 
-    freezer = DatasetFreezeManager(target_dir=target_dir)
-    manifest = freezer.freeze(
-        version_name=payload.get("version_name", "v1.0"),
-        source_dir=dirs["50_generated"],
-        split_ratios=payload.get("split_ratios", {"train": 0.8, "val": 0.1, "test": 0.1}),
+    engine = DatasetReleaseQAEngine()
+    report, _, _, _ = engine.run_qa_pipeline(
+        input_source=candidates_path,
+        output_dir=target_dir,
+        freeze=True,
     )
+    (target_dir / "FROZEN").touch()
 
     update_cb(100, "succeeded", "Dataset frozen and locked for training.")
     return {
         "status": "success",
         "collection_slug": collection_slug,
         "frozen_dir": str(target_dir),
-        "manifest_path": str(target_dir / "dataset-manifest.json"),
-        "version": manifest.get("version"),
+        "manifest_path": str(target_dir / "manifest.json"),
+        "version": report.dataset_version,
     }
 
 
