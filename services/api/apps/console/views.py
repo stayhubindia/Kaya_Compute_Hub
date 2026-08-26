@@ -30,6 +30,7 @@ class TerminalCommandView(APIView):
 
     def post(self, request):
         command = request.data.get('command', '').strip()
+        stdin_input = request.data.get('stdin_input', request.data.get('input', None))
         if not command:
             return Response({"error": "Command string is required."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -39,13 +40,20 @@ class TerminalCommandView(APIView):
             if not os.path.exists(cwd):
                 cwd = "/tmp"
 
+            env = os.environ.copy()
+            venv_bin = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../.venv/bin"))
+            if os.path.exists(venv_bin):
+                env["PATH"] = f"{venv_bin}:{env.get('PATH', '')}"
+
             res = subprocess.run(
                 command,
+                input=stdin_input if isinstance(stdin_input, str) else None,
                 shell=True,
                 capture_output=True,
                 text=True,
-                timeout=60,
-                cwd=cwd
+                timeout=90,
+                cwd=cwd,
+                env=env
             )
             elapsed_ms = int((time.time() - start_time) * 1000)
             return Response({

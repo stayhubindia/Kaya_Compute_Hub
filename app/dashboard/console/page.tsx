@@ -85,6 +85,8 @@ export default function ConsolePage() {
     { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Kaya Compute Colab Interactive Terminal v1.0 connected.\nType bash commands or use quick preset actions below.' }
   ]);
   const [isExecutingCmd, setIsExecutingCmd] = useState(false);
+  const [colabAuthUrl, setColabAuthUrl] = useState<string | null>(null);
+  const [authCodeInput, setAuthCodeInput] = useState('');
 
   // Code Runner State
   const [selectedTemplate, setSelectedTemplate] = useState('arxiv_test');
@@ -124,23 +126,35 @@ export default function ConsolePage() {
     }
   };
 
-  const handleRunCommand = async (cmdToRun?: string) => {
+  const handleRunCommand = async (cmdToRun?: string, stdinInput?: string) => {
     const cmd = (cmdToRun || commandInput).trim();
     if (!cmd) return;
 
     if (cmd === 'clear') {
       setTerminalLogs([]);
       setCommandInput('');
+      setColabAuthUrl(null);
       return;
     }
 
     const timeStr = new Date().toLocaleTimeString();
-    setTerminalLogs(prev => [...prev, { timestamp: timeStr, type: 'cmd', text: `$ ${cmd}` }]);
+    setTerminalLogs(prev => [...prev, { timestamp: timeStr, type: 'cmd', text: `$ ${cmd}${stdinInput ? ' [with authorization code]' : ''}` }]);
     if (!cmdToRun) setCommandInput('');
     setIsExecutingCmd(true);
 
     try {
-      const data: any = await api.post('/console/terminal/', { command: cmd });
+      const payload: any = { command: cmd };
+      if (stdinInput) payload.stdin_input = stdinInput;
+
+      const data: any = await api.post('/console/terminal/', payload);
+      const combinedOutput = `${data.stdout || ''}\n${data.stderr || ''}`;
+
+      // Detect Google OAuth URL in colab-cli output
+      const authMatch = combinedOutput.match(/https:\/\/accounts\.google\.com\/o\/oauth2\/auth\?[^\s\n]+/i);
+      if (authMatch) {
+        setColabAuthUrl(authMatch[0]);
+      }
+
       if (data.stdout) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: data.stdout }]);
       }
@@ -155,6 +169,14 @@ export default function ConsolePage() {
     } finally {
       setIsExecutingCmd(false);
     }
+  };
+
+  const handleCompleteColabAuth = async () => {
+    if (!authCodeInput.trim()) return;
+    const code = authCodeInput.trim();
+    setAuthCodeInput('');
+    setColabAuthUrl(null);
+    await handleRunCommand('colab new', `${code}\n`);
   };
 
   const handleExecuteScript = async () => {
@@ -232,15 +254,21 @@ export default function ConsolePage() {
               </span>
               <span style={{ fontSize: '12px', color: '#64748b' }}>(CWD: /content/drive/MyDrive/.../Arxiv)</span>
             </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => handleRunCommand('nvidia-smi')} style={{ background: '#1e293b', color: '#38bdf8', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button onClick={() => handleRunCommand('colab sessions')} style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                Colab Sessions
+              </button>
+              <button onClick={() => handleRunCommand('colab new')} style={{ background: '#4c1d95', color: '#c084fc', border: '1px solid #6b21a8', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                + Auth Colab (colab new)
+              </button>
+              <button onClick={() => handleRunCommand('colab status')} style={{ background: '#1e293b', color: '#38bdf8', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
+                Colab Status
+              </button>
+              <button onClick={() => handleRunCommand('nvidia-smi')} style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 GPU Status
               </button>
-              <button onClick={() => handleRunCommand('ls -la "/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv"')} style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
+              <button onClick={() => handleRunCommand('ls -la "/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv"')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 Check Drive
-              </button>
-              <button onClick={() => handleRunCommand('python3 --version && df -h /content/drive')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
-                System Info
               </button>
               <button onClick={() => handleRunCommand('clear')} style={{ background: '#334155', color: '#cbd5e1', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 Clear Log
@@ -262,6 +290,43 @@ export default function ConsolePage() {
             {isExecutingCmd && <div style={{ color: '#38bdf8' }}>Running command...</div>}
             <div ref={terminalEndRef} />
           </div>
+
+          {/* Google Colab OAuth Helper Banner */}
+          {colabAuthUrl && (
+            <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #311b92 100%)', border: '1px solid #6366f1', borderRadius: '8px', padding: '16px', marginBottom: '16px', boxShadow: '0 4px 12px rgba(99,102,241,0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>🔑</span>
+                  <strong style={{ color: '#a5b4fc', fontSize: '14px' }}>Google Colab OAuth Authorization Required</strong>
+                </div>
+                <button onClick={() => setColabAuthUrl(null)} style={{ background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '14px' }}>✕ Dismiss</button>
+              </div>
+              <p style={{ fontSize: '13px', color: '#c7d2fe', margin: '0 0 12px 0', lineHeight: '1.4' }}>
+                1. Click the button below to authorize <strong>colab-cli</strong> with your Google Account.<br />
+                2. Copy the authorization code returned by Google and paste it below to complete session activation:
+              </p>
+              <div style={{ marginBottom: '12px' }}>
+                <a href={colabAuthUrl} target="_blank" rel="noopener noreferrer" style={{ background: '#4f46e5', color: '#fff', padding: '8px 16px', borderRadius: '6px', fontSize: '13px', fontWeight: '600', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '6px', border: '1px solid #818cf8' }}>
+                  🌐 Open Google Authorization Page ↗
+                </a>
+              </div>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <input
+                  type="text"
+                  value={authCodeInput}
+                  onChange={(e) => setAuthCodeInput(e.target.value)}
+                  placeholder="Paste Google Authorization Code here (e.g. 4/0A...)"
+                  style={{ flex: 1, background: '#0f172a', border: '1px solid #6366f1', borderRadius: '6px', padding: '10px 14px', color: '#fff', fontFamily: 'monospace', fontSize: '13px' }}
+                />
+                <button
+                  onClick={handleCompleteColabAuth}
+                  style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '6px', padding: '0 20px', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}
+                >
+                  🚀 Connect Colab Session
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Terminal Command Input */}
           <form onSubmit={(e) => { e.preventDefault(); handleRunCommand(); }} style={{ display: 'flex', gap: '10px' }}>
