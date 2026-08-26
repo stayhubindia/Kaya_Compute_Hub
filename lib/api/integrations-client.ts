@@ -66,4 +66,24 @@ export const integrationsClient = {
   exportArtifactToDrive: async (accountId: string, artifactId: string): Promise<{ status: string; task_id: string }> => {
     return api.post<{ status: string; task_id: string }>(`/integrations/google/${accountId}/drive/export/`, { artifact_id: artifactId });
   },
+
+  createColabSession: async (data: { account_id?: string; session_name?: string; gpu_variant?: string }): Promise<{
+    status: string;
+    session_name: string;
+    account_email: string;
+    gpu_variant: string;
+    created_at: string;
+    kernel_ready: boolean;
+    message: string;
+  }> => {
+    return api.post('/integrations/colab/sessions/create/', data);
+  },
+
+  listColabSessions: async (): Promise<{ output_raw: string; sessions: string[]; active_count: number }> => {
+    return api.get('/integrations/colab/sessions/');
+  },
+
+  stopColabSession: async (sessionName: string): Promise<{ status: string; session_name: string; message: string }> => {
+    return api.post('/integrations/colab/sessions/stop/', { session_name: sessionName });
+  },
 };

@@ -8,6 +8,7 @@ import { WorkerNodeCard } from '@/components/features/workers/worker-node-card';
 import { LoadingState } from '@/components/shared/loading-state';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import ColabSessionLauncher from '@/components/ColabSessionLauncher';
 
 export default function DashboardWorkersPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -32,11 +33,14 @@ export default function DashboardWorkersPage() {
 
           <button
             onClick={() => refetch()}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors"
+            style={{ padding: '8px 16px', background: '#1e293b', color: '#f8fafc', border: '1px solid #334155', borderRadius: '8px', fontWeight: '600', cursor: 'pointer', fontSize: '13px' }}
           >
             🔄 Refresh Status
           </button>
         </div>
+
+        {/* Colab VM Session Launcher Panel */}
+        <ColabSessionLauncher onSessionCreated={() => refetch()} />
 
         {error && <ErrorState message={error} onRetry={refetch} />}
 

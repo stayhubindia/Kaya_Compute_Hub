@@ -8,6 +8,7 @@ import { StatusBadge } from '@/components/shared/status-badge';
 import { LoadingState } from '@/components/shared/loading-state';
 import { EmptyState } from '@/components/shared/empty-state';
 import { ErrorState } from '@/components/shared/error-state';
+import ColabSessionLauncher from '@/components/ColabSessionLauncher';
 
 export default function ConnectionsSettingsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -295,6 +296,9 @@ export default function ConnectionsSettingsPage() {
         )}
 
         {/* Account Cards List */}
+        {/* Colab VM Session Launcher Panel */}
+        <ColabSessionLauncher />
+
         {accounts.length === 0 ? (
           <EmptyState
             title="No Colab Accounts Registered in Vault"

@@ -586,3 +586,152 @@ def colab_run_cancel(request, pk):
 
     serializer = ExternalRunSerializer(run)
     return Response(serializer.data)
+
+
+# --- Google Colab CLI VM Session Allocator ---
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_session_create(request):
+    """
+    Allocate and launch a new Google Colab VM session for any authenticated Vault account.
+    Supports GPU (T4, L4, A100), TPU (v5e1), or CPU runtimes.
+    """
+    account_id = request.data.get('account_id')
+    session_name = request.data.get('session_name', 'colab-worker').strip()
+    gpu_variant = request.data.get('gpu_variant', 'T4').strip()
+
+    if not session_name:
+        session_name = f"colab-session-{uuid.uuid4().hex[:6]}"
+
+    account = None
+    if account_id:
+        try:
+            account = ConnectedAccount.objects.get(pk=account_id, user=request.user)
+        except ConnectedAccount.DoesNotExist:
+            return Response({"error": {"message": "Selected Vault account not found."}}, status=status.HTTP_404_NOT_FOUND)
+
+    # Sync selected Vault account credentials to active ~/.config/colab-cli/token.json
+    if account:
+        safe_filename = account.email.replace("@", "_at_")
+        vault_file = Path.home() / f".config/colab-cli/saved_accounts/{safe_filename}.json"
+        token_file = Path.home() / ".config/colab-cli/token.json"
+        token_file.parent.mkdir(parents=True, exist_ok=True)
+
+        if vault_file.exists():
+            shutil.copy2(vault_file, token_file)
+        else:
+            access_token = account.get_access_token()
+            refresh_token = account.get_refresh_token()
+            token_data = {
+                "email": account.email,
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+            }
+            token_file.write_text(json.dumps(token_data, indent=2))
+
+    # Clear stale sessions cache
+    sessions_cache = Path.home() / ".config/colab-cli/sessions.json"
+    if sessions_cache.exists():
+        try:
+            sessions_cache.unlink()
+        except Exception:
+            pass
+
+    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
+    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+
+    # Stop orphan local assignment first
+    subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+
+    cmd = [colab_bin, "new", "-s", session_name]
+    if gpu_variant.upper() in ["T4", "L4", "G4", "H100", "A100"]:
+        cmd.extend(["--gpu", gpu_variant.upper()])
+    elif gpu_variant.upper() in ["TPU", "V5E1", "V6E1"]:
+        cmd.extend(["--tpu", "v5e1" if gpu_variant.upper() == "TPU" else gpu_variant.lower()])
+
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=90)
+        output = f"{proc.stdout}\n{proc.stderr}"
+
+        if proc.returncode != 0 and ("ColabRequestError" in output or "412" in output or "503" in output):
+            return Response({
+                "status": "error",
+                "message": f"Colab session allocation failed: {proc.stderr.strip() or proc.stdout.strip()}"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Readiness ping check on Colab VM Kernel
+        ping_script = Path("/tmp/ping_colab.py")
+        ping_script.write_text("print('COLAB_VM_READY')\n", encoding="utf-8")
+
+        ping_proc = subprocess.run(
+            [colab_bin, "exec", "-s", session_name, "-f", str(ping_script)],
+            stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25
+        )
+        kernel_ready = "COLAB_VM_READY" in ping_proc.stdout or proc.returncode == 0
+
+        log_audit_event(
+            action="colab.session_created",
+            resource_type="colab_session",
+            resource_id=session_name,
+            actor=request.user,
+            metadata={"gpu_variant": gpu_variant, "account": account.email if account else "default"},
+            request=request
+        )
+
+        return Response({
+            "status": "success",
+            "session_name": session_name,
+            "account_email": account.email if account else "Default Vault Account",
+            "gpu_variant": gpu_variant,
+            "created_at": timezone.now().isoformat(),
+            "kernel_ready": kernel_ready,
+            "message": f"Google Colab VM session '{session_name}' ({gpu_variant}) successfully created and verified!"
+        }, status=status.HTTP_201_CREATED)
+
+    except subprocess.TimeoutExpired:
+        return Response({"error": {"message": "Colab session allocation request timed out."}}, status=status.HTTP_504_GATEWAY_TIMEOUT)
+    except Exception as e:
+        return Response({"error": {"message": str(e)}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_sessions_list(request):
+    """List active Google Colab VM sessions."""
+    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
+    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+
+    try:
+        proc = subprocess.run([colab_bin, "sessions"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        raw_lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+
+        return Response({
+            "output_raw": proc.stdout,
+            "sessions": raw_lines,
+            "active_count": len(raw_lines)
+        })
+    except Exception as e:
+        return Response({"output_raw": "", "sessions": [], "active_count": 0, "error": str(e)})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_session_stop(request):
+    """Stop/terminate an active Google Colab VM session."""
+    session_name = request.data.get('session_name', '').strip()
+    if not session_name:
+        return Response({"error": {"message": "session_name is required."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    venv_colab = Path(__file__).resolve().parent.parent.parent.parent / ".venv/bin/colab"
+    colab_bin = str(venv_colab) if venv_colab.exists() else shutil.which("colab") or "colab"
+
+    try:
+        proc = subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+        return Response({
+            "status": "stopped",
+            "session_name": session_name,
+            "message": f"Colab session '{session_name}' stopped successfully."
+        })
+    except Exception as e:
+        return Response({"error": {"message": str(e)}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
