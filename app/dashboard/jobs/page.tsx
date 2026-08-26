@@ -86,6 +86,17 @@ export default function DashboardJobsPage() {
     }
   };
 
+  const handleDelete = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this job permanently?")) return;
+    try {
+      await jobsClient.deleteJob(id);
+      setActionSuccess(`Job ${id.slice(0, 8)} deleted permanently.`);
+      await fetchJobs();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete job.');
+    }
+  };
+
   if (isLoading) {
     return <div style={{ background: '#090d16', minHeight: '100vh', color: '#fff', padding: '40px' }}>Loading jobs...</div>;
   }
@@ -168,32 +179,50 @@ export default function DashboardJobsPage() {
 
         {/* Jobs List */}
         <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '16px' }}>Job Queue</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '600' }}>Job Queue</h2>
+            <button
+              onClick={fetchJobs}
+              style={{ background: '#0f172a', border: '1px solid #334155', color: '#94a3b8', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+            >
+              🔄 Refresh
+            </button>
+          </div>
+
           {jobs.length === 0 ? (
             <div style={{ color: '#94a3b8', textAlign: 'center', padding: '24px' }}>No jobs enqueued.</div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               {jobs.map((j) => (
-                <div key={j.id} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={j.id} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
-                    <div style={{ fontWeight: '600', fontSize: '16px' }}>{j.name} <span style={{ fontSize: '12px', color: '#94a3b8' }}>({j.job_type})</span></div>
+                    <div style={{ fontWeight: '600', fontSize: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {j.name} <span style={{ fontSize: '12px', color: '#94a3b8' }}>({j.job_type})</span>
+                    </div>
                     <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Stage: {j.current_stage || j.status} • {j.progress_message || 'In queue'}</div>
                     <div style={{ marginTop: '8px', width: '240px', background: '#334155', borderRadius: '4px', height: '6px', overflow: 'hidden' }}>
-                      <div style={{ width: `${j.progress_percentage}%`, background: '#38bdf8', height: '100%' }} />
+                      <div style={{ width: `${j.progress_percentage || 0}%`, background: '#38bdf8', height: '100%' }} />
                     </div>
                   </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span style={{ padding: '4px 8px', borderRadius: '4px', fontSize: '12px', background: '#1e3a8a', color: '#93c5fd' }}>
-                      {j.status} ({j.progress_percentage}%)
+                      {j.status} ({j.progress_percentage || 0}%)
                     </span>
 
-                    {['queued', 'running', 'leased'].includes(j.status) && (
+                    <a
+                      href={`/dashboard/jobs/${j.id}`}
+                      style={{ padding: '6px 12px', background: '#0284c7', color: '#fff', borderRadius: '6px', fontSize: '12px', textDecoration: 'none', fontWeight: '600' }}
+                    >
+                      🖥️ View Logs
+                    </a>
+
+                    {['queued', 'running', 'leased', 'draft'].includes(j.status) && (
                       <button
                         onClick={() => handleCancel(j.id)}
                         style={{ padding: '6px 12px', background: '#7f1d1d', color: '#fca5a5', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
                       >
-                        Cancel
+                        🛑 Cancel
                       </button>
                     )}
 
@@ -202,9 +231,16 @@ export default function DashboardJobsPage() {
                         onClick={() => handleRetry(j.id)}
                         style={{ padding: '6px 12px', background: '#1e3a8a', color: '#93c5fd', border: 'none', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
                       >
-                        Retry
+                        🔄 Retry
                       </button>
                     )}
+
+                    <button
+                      onClick={() => handleDelete(j.id)}
+                      style={{ padding: '6px 12px', background: '#0f172a', color: '#f87171', border: '1px solid #991b1b', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+                    >
+                      🗑️ Delete
+                    </button>
                   </div>
                 </div>
               ))}

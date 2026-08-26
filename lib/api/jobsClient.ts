@@ -64,4 +64,11 @@ export const jobsClient = {
       signal,
     });
   },
+
+  async deleteJob(id: string, signal?: AbortSignal): Promise<{ id: string; message: string }> {
+    return apiClient<{ id: string; message: string }>(`/jobs/${id}/`, {
+      method: 'DELETE',
+      signal,
+    });
+  },
 };
