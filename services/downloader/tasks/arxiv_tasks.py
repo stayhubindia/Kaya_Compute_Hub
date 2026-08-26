@@ -26,14 +26,17 @@ def resolve_arxiv_output_path(month_str: str, custom_dir: str = "") -> Path:
 
     if custom_dir:
         base_path = Path(custom_dir)
+        if base_path.name == year or year in base_path.parts:
+            out_path = base_path
+        else:
+            out_path = base_path / year
     else:
-        base_path = COLAB_GDRIVE_BASE
+        out_path = COLAB_GDRIVE_BASE / year
 
     try:
-        out_path = base_path / year
         out_path.mkdir(parents=True, exist_ok=True)
     except Exception as exc:
-        logger.warning(f"[ARXIV OUTPUT] Cannot write to {base_path}: {exc}. Falling back to {FALLBACK_LOCAL_BASE}")
+        logger.warning(f"[ARXIV OUTPUT] Cannot write to {out_path}: {exc}. Falling back to {FALLBACK_LOCAL_BASE / year}")
         out_path = FALLBACK_LOCAL_BASE / year
         out_path.mkdir(parents=True, exist_ok=True)
 
