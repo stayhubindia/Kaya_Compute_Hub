@@ -1,5 +1,7 @@
 import os
 import uuid
+import json
+from pathlib import Path
 from datetime import timedelta
 from django.utils import timezone
 from django.shortcuts import redirect
@@ -304,6 +306,77 @@ def google_account_reconnect(request, pk):
         "expires_at": expires_at.isoformat(),
         "account_id": str(account.id)
     })
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def google_account_direct_connect(request):
+    """
+    Direct token/credential vault entry for Google Drive & Colab accounts without web OAuth popup redirect.
+    Saves to ConnectedAccount model and syncs to ~/.config/colab-cli/saved_accounts/<email>.json.
+    """
+    email = request.data.get('email', '').strip()
+    display_name = request.data.get('display_name', '').strip() or email
+    access_token = request.data.get('access_token', '').strip()
+    refresh_token = request.data.get('refresh_token', '').strip()
+    raw_json = request.data.get('raw_json', '')
+
+    if not email:
+        return Response({"error": {"message": "Email address is required."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    provider_account_id = f"manual-{uuid.uuid4().hex[:12]}"
+    
+    account, created = ConnectedAccount.objects.get_or_create(
+        user=request.user,
+        email=email,
+        defaults={
+            'provider': 'google',
+            'provider_account_id': provider_account_id,
+            'display_name': display_name,
+        }
+    )
+
+    account.display_name = display_name
+    if access_token:
+        account.set_access_token(access_token)
+    if refresh_token:
+        account.set_refresh_token(refresh_token)
+    
+    account.status = AccountStatusChoices.ACTIVE
+    account.token_expiry = timezone.now() + timedelta(days=365)
+    account.last_verified_at = timezone.now()
+    account.scopes = ["drive.file", "colab"]
+    account.save()
+
+    # Sync to local Vault directory ~/.config/colab-cli/saved_accounts/ for Colab account manager
+    try:
+        vault_dir = Path.home() / ".config/colab-cli/saved_accounts"
+        vault_dir.mkdir(parents=True, exist_ok=True)
+        safe_filename = email.replace("@", "_at_")
+        vault_file = vault_dir / f"{safe_filename}.json"
+        
+        token_data = {
+            "email": email,
+            "access_token": access_token or "direct_token",
+            "refresh_token": refresh_token or "",
+            "raw_json": raw_json,
+            "created_at": timezone.now().isoformat()
+        }
+        vault_file.write_text(json.dumps(token_data, indent=2))
+    except Exception:
+        pass
+
+    log_audit_event(
+        action="auth.google_account_direct_connected",
+        resource_type="connected_account",
+        resource_id=str(account.id),
+        actor=request.user,
+        metadata={"email": email},
+        request=request
+    )
+
+    serializer = ConnectedAccountSerializer(account)
+    return Response(serializer.data, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
 
 # --- Google Drive API Endpoints ---
