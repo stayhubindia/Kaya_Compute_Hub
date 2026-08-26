@@ -5,10 +5,12 @@ After=network.target kaya-redis.service
 [Service]
 Type=simple
 User=durgesh
-WorkingDirectory=/home/durgesh/Desktop/Projects/Colab_Account_VM
-Environment="PATH=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin:/usr/bin"
+WorkingDirectory=/home/Project/Kaya_Compute_Hub/services/api
+EnvironmentFile=-/home/Project/Kaya_Compute_Hub/.env
+EnvironmentFile=-/home/Project/Kaya_Compute_Hub/services/api/.env
+Environment="PATH=/home/Project/Kaya_Compute_Hub/.venv/bin:/usr/bin"
 Environment="DJANGO_SETTINGS_MODULE=config.settings.base"
-ExecStart=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 2 --timeout 120
+ExecStart=/home/Project/Kaya_Compute_Hub/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 2 --timeout 120
 Restart=always
 RestartSec=5s
 

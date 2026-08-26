@@ -11,6 +11,12 @@ for p in [str(BASE_DIR), str(WORKSPACE_DIR)]:
         sys.path.insert(0, p)
 
 import secrets
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BASE_DIR / ".env")
+    load_dotenv(WORKSPACE_DIR / ".env")
+except ImportError:
+    pass
 
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY') or secrets.token_urlsafe(64)
 TOTP_ENCRYPTION_KEY = os.environ.get('TOTP_ENCRYPTION_KEY') or secrets.token_urlsafe(64)

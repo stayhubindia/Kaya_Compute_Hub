@@ -5,10 +5,12 @@ After=network.target kaya-redis.service
 [Service]
 Type=simple
 User=durgesh
-WorkingDirectory=/home/durgesh/Desktop/Projects/Colab_Account_VM
-Environment="PATH=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin:/usr/bin"
-Environment="PYTHONPATH=/home/durgesh/Desktop/Projects/Colab_Account_VM:/home/durgesh/Desktop/Projects/Colab_Account_VM/services/api"
-ExecStart=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin/celery -A services.worker.celery_app worker -l info -c 1 --prefetch-multiplier=1
+WorkingDirectory=/home/Project/Kaya_Compute_Hub
+EnvironmentFile=-/home/Project/Kaya_Compute_Hub/.env
+EnvironmentFile=-/home/Project/Kaya_Compute_Hub/services/api/.env
+Environment="PATH=/home/Project/Kaya_Compute_Hub/.venv/bin:/usr/bin"
+Environment="PYTHONPATH=/home/Project/Kaya_Compute_Hub:/home/Project/Kaya_Compute_Hub/services/api"
+ExecStart=/home/Project/Kaya_Compute_Hub/.venv/bin/celery -A services.worker.celery_app worker -l info -c 1 --prefetch-multiplier=1
 Restart=always
 RestartSec=5s
 
