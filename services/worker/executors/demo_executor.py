@@ -31,6 +31,7 @@ APPROVED_DEMO_EXECUTORS = {
     'extraction': simulate_extraction,
     'preprocessing': simulate_preprocessing,
 }
+APPROVED_EXECUTORS = APPROVED_DEMO_EXECUTORS
 
 def run_approved_executor(job_type: str, job_payload: dict, update_progress_cb: Callable[[int, str, str], None]) -> dict:
     """
