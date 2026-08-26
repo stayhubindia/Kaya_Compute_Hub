@@ -54,8 +54,8 @@ jobs:
       - name: Deploy to Remote VM via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: "15.252.100.159"
-          username: "durgesh"
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
           password: ${{ secrets.VM_PASSWORD }}
           script: |
             set -e
