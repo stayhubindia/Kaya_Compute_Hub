@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import { User, authClient } from "@/lib/api/authClient";
 import { Job, jobsClient } from "@/lib/api/jobsClient";
-import { apiClient } from "@/lib/api/client";
+import { integrationsClient, ConnectedAccount } from "@/lib/api/integrations-client";
 import Link from "next/link";
 
 interface PipelinePayload {
@@ -28,10 +28,14 @@ interface PipelinePayload {
 export default function DatasetFactoryPage() {
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<"ingest" | "generate" | "qa" | "freeze" | "train" | "sync">("ingest");
-  
+
+  // Accounts State
+  const [colabAccounts, setColabAccounts] = useState<ConnectedAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>("");
+
   // Form State
   const [collectionSlug, setCollectionSlug] = useState("cybersecurity_v1");
-  const [sourceName, setSourceName] = useState("arXiv Security");
+  const [sourceName, setSourceName] = useState("arXiv Security Papers");
   const [inputPath, setInputPath] = useState("/srv/kaya-data/raw_sources");
   const [maxDocuments, setMaxDocuments] = useState(100);
   const [candidateCount, setCandidateCount] = useState(500);
@@ -56,7 +60,7 @@ export default function DatasetFactoryPage() {
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
 
-  // Load User & Jobs
+  // Load User, Jobs & Colab Vault Accounts
   const fetchJobs = async () => {
     try {
       const data = await jobsClient.listJobs();
@@ -76,6 +80,17 @@ export default function DatasetFactoryPage() {
       } catch {
         setUser(null);
       }
+
+      try {
+        const accs = await integrationsClient.listConnectedAccounts();
+        setColabAccounts(accs);
+        if (accs.length > 0) {
+          setSelectedAccountId(accs[0].id);
+        }
+      } catch {
+        // Vault accounts fetch silent fail
+      }
+
       await fetchJobs();
     }
     init();
@@ -84,48 +99,45 @@ export default function DatasetFactoryPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleLaunchPipeline = async (pipelineType: string, payload: PipelinePayload) => {
+  const handleLaunchPipeline = async (pipelineStage: string, payload: PipelinePayload) => {
     setIsSubmitting(true);
     setStatusMessage(null);
 
+    const jobTypeMap: Record<string, 'download' | 'extraction' | 'preprocessing' | 'notebook' | 'training' | 'evaluation'> = {
+      ingest: 'extraction',
+      generate: 'preprocessing',
+      qa: 'evaluation',
+      release: 'preprocessing',
+      train: 'training',
+      sync: 'notebook'
+    };
+
+    const mappedType = jobTypeMap[pipelineStage] || 'preprocessing';
+
     try {
-      // Map factory actions to pipeline or jobs endpoints
-      const res = await apiClient<{ id: string; message?: string; status?: string }>(`/jobs/${pipelineType}/`, {
-        method: "POST",
-        body: JSON.stringify({
+      const jobRes = await jobsClient.createJob({
+        name: `Factory Stage [${pipelineStage.toUpperCase()}] - ${collectionSlug}`,
+        job_type: mappedType,
+        description: `Dataset Factory stage execution for source '${sourceName}'`,
+        payload: {
+          ...payload,
+          pipeline_stage: pipelineStage,
           collection_slug: collectionSlug,
-          source: sourceName,
-          payload,
-        }),
+          account_id: selectedAccountId || undefined
+        }
       });
 
       setStatusMessage({
         type: "success",
-        text: `Pipeline stage '${pipelineType.toUpperCase()}' enqueued! Job ID: ${res.id || "Active"}`,
+        text: `🚀 Pipeline stage '${pipelineStage.toUpperCase()}' enqueued successfully! Job ID: ${jobRes.id}`,
       });
 
       await fetchJobs();
     } catch (err: any) {
-      // Fallback to standard job creation if endpoint fails
-      try {
-        const fallbackRes = await jobsClient.createJob({
-          name: `Pipeline ${pipelineType.toUpperCase()} - ${collectionSlug}`,
-          job_type: pipelineType === "train" ? "training" : "preprocessing",
-          description: `Orchestrated from Dataset Factory (${sourceName})`,
-          payload: { ...payload, collection_slug: collectionSlug },
-        });
-
-        setStatusMessage({
-          type: "success",
-          text: `Pipeline job enqueued successfully! Job ID: ${fallbackRes.id}`,
-        });
-        await fetchJobs();
-      } catch (fallbackErr: any) {
-        setStatusMessage({
-          type: "error",
-          text: `Submission Error: ${fallbackErr.message || err.message || "Failed to launch pipeline stage"}`,
-        });
-      }
+      setStatusMessage({
+        type: "error",
+        text: `Submission Error: ${err.message || "Failed to launch pipeline stage"}`,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -168,7 +180,7 @@ export default function DatasetFactoryPage() {
           <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
             <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Active Pipeline Tasks</div>
             <div className="text-2xl font-bold text-sky-400 mt-1">
-              {recentJobs.filter((j) => ["queued", "running", "leased"].includes(j.status)).length} Tasks Running
+              {recentJobs.filter((j) => ["queued", "running", "leased"].includes(j.status)).length} Running
             </div>
             <div className="text-[11px] text-slate-500 mt-1">Celery Worker Isolated Queue</div>
           </div>
@@ -180,15 +192,17 @@ export default function DatasetFactoryPage() {
           </div>
 
           <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Target Target Collection</div>
+            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Target Collection</div>
             <div className="text-lg font-bold text-indigo-300 mt-1 truncate">{collectionSlug}</div>
             <div className="text-[11px] text-slate-500 mt-1">Version {versionName}</div>
           </div>
 
           <div className="bg-slate-900/60 backdrop-blur border border-slate-800/80 p-5 rounded-xl">
-            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">QA Engine Version</div>
-            <div className="text-lg font-bold text-emerald-400 mt-1">DatasetReleaseQA V2</div>
-            <div className="text-[11px] text-slate-500 mt-1">SHA-256 Checksum Verified</div>
+            <div className="text-xs font-mono uppercase tracking-wider text-slate-400">Colab Accounts in Vault</div>
+            <div className="text-lg font-bold text-emerald-400 mt-1">
+              {colabAccounts.length} Active {colabAccounts.length === 1 ? 'Account' : 'Accounts'}
+            </div>
+            <div className="text-[11px] text-slate-500 mt-1">Direct Vault Credentials</div>
           </div>
         </div>
 
@@ -218,9 +232,9 @@ export default function DatasetFactoryPage() {
         <div className="bg-gradient-to-r from-slate-900/90 via-slate-900/60 to-slate-950 border border-slate-800 p-6 rounded-2xl mb-8 shadow-xl">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-sky-400 mb-4 flex items-center">
             <span className="w-2 h-2 rounded-full bg-sky-400 mr-2"></span>
-            Global Collection Context Parameters
+            Global Collection Context & Worker Credentials
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">Collection Identifier Slug</label>
               <input
@@ -231,6 +245,7 @@ export default function DatasetFactoryPage() {
                 className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-mono"
               />
             </div>
+
             <div>
               <label className="block text-xs font-medium text-slate-300 mb-1.5">Source Dataset Name</label>
               <input
@@ -240,6 +255,30 @@ export default function DatasetFactoryPage() {
                 placeholder="e.g. arXiv Security Papers"
                 className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all"
               />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-300 mb-1.5">Assigned Colab Account (Vault)</label>
+              {colabAccounts.length > 0 ? (
+                <select
+                  value={selectedAccountId}
+                  onChange={(e) => setSelectedAccountId(e.target.value)}
+                  className="w-full bg-slate-950/90 border border-slate-700/80 rounded-lg px-3.5 py-2.5 text-sm text-sky-300 focus:outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-500 transition-all font-medium"
+                >
+                  {colabAccounts.map((acc) => (
+                    <option key={acc.id} value={acc.id}>
+                      {acc.email} ({acc.status.toUpperCase()})
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Link
+                  href="/dashboard/settings/connections"
+                  className="block text-xs text-amber-400 bg-amber-950/40 border border-amber-800/60 p-2.5 rounded-lg text-center hover:underline"
+                >
+                  ⚠️ No Colab Accounts linked. Click to Register in Vault
+                </Link>
+              )}
             </div>
           </div>
         </div>
