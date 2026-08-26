@@ -56,6 +56,7 @@ INSTALLED_APPS = [
     'apps.logs',
     'apps.monitoring',
     'apps.integrations',
+    'apps.console',
 ]
 
 MIDDLEWARE = [

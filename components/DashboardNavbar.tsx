@@ -25,6 +25,7 @@ export default function DashboardNavbar({ user }: Props) {
 
   const navItems = [
     { href: '/dashboard', label: 'Overview' },
+    { href: '/dashboard/console', label: 'Console & Runner' },
     { href: '/dashboard/factory', label: 'Dataset Factory' },
     { href: '/dashboard/jobs', label: 'Jobs' },
     { href: '/dashboard/workers', label: 'Workers' },

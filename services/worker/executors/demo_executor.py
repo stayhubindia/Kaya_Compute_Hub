@@ -26,10 +26,43 @@ def simulate_preprocessing(job_payload: dict, update_progress_cb: Callable[[int,
     update_progress_cb(100, "completed", "Dataset preprocessing complete")
     return {"records_processed": 1000, "status": "simulated_success"}
 
+import subprocess
+import sys
+import tempfile
+import os
+
+def execute_custom_script(job_payload: dict, update_progress_cb: Callable[[int, str, str], None]) -> dict:
+    code = job_payload.get("code", "")
+    update_progress_cb(10, "executing", "Initializing script environment...")
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
+        f.write(code)
+        temp_path = f.name
+        
+    try:
+        update_progress_cb(40, "executing", "Running Python script...")
+        res = subprocess.run(
+            [sys.executable, temp_path],
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+        update_progress_cb(100, "completed" if res.returncode == 0 else "failed", "Script execution finished.")
+        return {
+            "returncode": res.returncode,
+            "stdout": res.stdout,
+            "stderr": res.stderr,
+            "status": "success" if res.returncode == 0 else "failed"
+        }
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
 APPROVED_DEMO_EXECUTORS = {
     'download': simulate_download,
     'extraction': simulate_extraction,
     'preprocessing': simulate_preprocessing,
+    'custom_script': execute_custom_script,
 }
 APPROVED_EXECUTORS = APPROVED_DEMO_EXECUTORS
 

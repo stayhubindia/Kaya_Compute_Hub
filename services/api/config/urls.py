@@ -52,6 +52,7 @@ urlpatterns = [
     path('api/v1/', include('apps.events.urls')),
     path('api/v1/', include('apps.logs.urls')),
     path('api/v1/integrations/', include('apps.integrations.urls')),
+    path('api/v1/console/', include('apps.console.urls')),
     path('api/v1/arxiv/batch/start/', arxiv_batch_start, name='arxiv-batch-start'),
     path('api/v1/arxiv/batch/<str:job_id>/status/', arxiv_batch_status, name='arxiv-batch-status'),
 ]
