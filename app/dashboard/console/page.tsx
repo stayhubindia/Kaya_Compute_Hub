@@ -104,9 +104,10 @@ export default function ConsolePage() {
   const [loading, setLoading] = useState(true);
 
   // Terminal State
+  const [terminalTarget, setTerminalTarget] = useState<'colab' | 'vm'>('colab');
   const [commandInput, setCommandInput] = useState('');
   const [terminalLogs, setTerminalLogs] = useState<Array<{ timestamp: string; type: 'cmd' | 'stdout' | 'stderr' | 'system'; text: string }>>([
-    { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Kaya Compute Colab Interactive Terminal v1.0 connected.\nType bash commands or use quick preset actions below.' }
+    { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Kaya Compute Colab Interactive Terminal v2.0 connected.\n[TARGET: 🌐 Google Colab Cloud Container (root@colab-cloud:#)]\nType any bash command (whoami, pwd, ls -la, nvidia-smi) to execute directly inside your Colab container.' }
   ]);
   const [isExecutingCmd, setIsExecutingCmd] = useState(false);
   const [colabAuthUrl, setColabAuthUrl] = useState<string | null>(null);
@@ -199,24 +200,35 @@ export default function ConsolePage() {
   };
 
   const handleRunCommand = async (cmdToRun?: string, stdinInput?: string) => {
-    const cmd = (cmdToRun || commandInput).trim();
-    if (!cmd) return;
+    const rawCmd = (cmdToRun || commandInput).trim();
+    if (!rawCmd) return;
 
-    if (cmd === 'clear') {
+    if (rawCmd === 'clear') {
       setTerminalLogs([]);
       setCommandInput('');
       setColabAuthUrl(null);
       return;
     }
 
+    const isColabCli = rawCmd.startsWith('colab');
+    const isCloudTarget = terminalTarget === 'colab' && !isColabCli;
+
     const timeStr = new Date().toLocaleTimeString();
-    setTerminalLogs(prev => [...prev, { timestamp: timeStr, type: 'cmd', text: `$ ${cmd}${stdinInput ? ' [with authorization code]' : ''}` }]);
+    const promptPrefix = isCloudTarget ? 'root@colab-cloud:#' : 'durgesh@kaya-vm:$';
+    setTerminalLogs(prev => [...prev, { timestamp: timeStr, type: 'cmd', text: `${promptPrefix} ${rawCmd}${stdinInput ? ' [input attached]' : ''}` }]);
     if (!cmdToRun) setCommandInput('');
     setIsExecutingCmd(true);
 
     try {
-      const payload: any = { command: cmd };
-      if (stdinInput) payload.stdin_input = stdinInput;
+      let payload: any;
+      if (isCloudTarget) {
+        // Execute bash command inside Google Colab cloud container via colab exec
+        const pyWrapper = `import subprocess\nprint(subprocess.getoutput('''${rawCmd}'''))\n`;
+        payload = { command: 'colab exec', stdin_input: pyWrapper };
+      } else {
+        payload = { command: rawCmd };
+        if (stdinInput) payload.stdin_input = stdinInput;
+      }
 
       const data: any = await api.post('/console/terminal/', payload);
       const combinedOutput = `${data.stdout || ''}\n${data.stderr || ''}`;
@@ -536,11 +548,29 @@ export default function ConsolePage() {
         {activeTab === 'terminal' && (
           <div style={{ background: '#0f172a', border: '1px solid #1e293b', borderRadius: '12px', padding: '20px', marginBottom: '24px', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.5)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <span style={{ fontSize: '16px', fontWeight: '700', color: '#f1f5f9' }}>
                 🖥️ Colab Terminal Console
               </span>
-              <span style={{ fontSize: '12px', color: '#64748b' }}>(CWD: /content/drive/MyDrive/.../Arxiv)</span>
+              
+              {/* Target Selector */}
+              <select
+                value={terminalTarget}
+                onChange={(e) => setTerminalTarget(e.target.value as 'colab' | 'vm')}
+                style={{
+                  background: terminalTarget === 'colab' ? '#064e3b' : '#1e293b',
+                  color: terminalTarget === 'colab' ? '#34d399' : '#38bdf8',
+                  border: terminalTarget === 'colab' ? '1px solid #059669' : '1px solid #334155',
+                  borderRadius: '6px',
+                  padding: '4px 10px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                <option value="colab">🌐 Google Colab Cloud Container (root@colab-cloud:#)</option>
+                <option value="vm">💻 Host VM Server (durgesh@kaya-vm:$)</option>
+              </select>
             </div>
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               <button onClick={() => handleRunCommand('colab sessions')} style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
@@ -555,8 +585,8 @@ export default function ConsolePage() {
               <button onClick={() => handleRunCommand('nvidia-smi')} style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 GPU Status
               </button>
-              <button onClick={() => handleRunCommand('ls -la "/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv"')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
-                Check Drive
+              <button onClick={() => handleRunCommand('ls -la')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
+                List Files
               </button>
               <button onClick={() => handleRunCommand('clear')} style={{ background: '#334155', color: '#cbd5e1', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 Clear Log
@@ -618,8 +648,19 @@ export default function ConsolePage() {
 
           {/* Terminal Command Input */}
           <form onSubmit={(e) => { e.preventDefault(); handleRunCommand(); }} style={{ display: 'flex', gap: '10px' }}>
-            <span style={{ background: '#1e293b', color: '#38bdf8', padding: '10px 14px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '14px', display: 'flex', alignItems: 'center' }}>
-              durgesh@kaya:~$
+            <span style={{
+              background: terminalTarget === 'colab' ? '#064e3b' : '#1e293b',
+              color: terminalTarget === 'colab' ? '#34d399' : '#38bdf8',
+              border: terminalTarget === 'colab' ? '1px solid #059669' : '1px solid #334155',
+              padding: '10px 14px',
+              borderRadius: '6px',
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              fontWeight: '700',
+              display: 'flex',
+              alignItems: 'center'
+            }}>
+              {terminalTarget === 'colab' ? 'root@colab-cloud:#' : 'durgesh@kaya-vm:$'}
             </span>
             <input
               type="text"
