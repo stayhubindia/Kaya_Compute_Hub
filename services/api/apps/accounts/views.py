@@ -38,8 +38,8 @@ class LoginView(APIView):
         # Perform login and session rotation
         login(request, user)
         request.session.cycle_key()
-        # Extend session to 1 hour (3600 seconds) explicitly on each login
-        request.session.set_expiry(3600)
+        # Extend session to 30 days (86400 * 30) explicitly on login
+        request.session.set_expiry(86400 * 30)
 
         log_audit_event(
             action="auth.login_success",
