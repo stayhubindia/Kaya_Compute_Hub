@@ -10,11 +10,16 @@ from apps.accounts.serializers import UserSerializer, LoginSerializer
 from apps.accounts.permissions import IsAuthenticatedAdmin
 from apps.audit.services import log_audit_event
 
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
+
 class LoginRateThrottle(AnonRateThrottle):
     rate = '10/minute'
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
     throttle_classes = [LoginRateThrottle]
 
     def post(self, request):
@@ -54,8 +59,10 @@ class LoginView(APIView):
         }, status=status.HTTP_200_OK)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class LogoutView(APIView):
     permission_classes = [permissions.AllowAny]
+    authentication_classes = []
 
     def post(self, request):
         if request.user and request.user.is_authenticated:
