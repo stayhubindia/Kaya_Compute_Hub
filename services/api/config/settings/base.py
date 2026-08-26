@@ -88,9 +88,9 @@ CSRF_COOKIE_SECURE = os.environ.get('DJANGO_CSRF_COOKIE_SECURE', 'False').lower(
 SESSION_COOKIE_SAMESITE = os.environ.get('DJANGO_SESSION_COOKIE_SAMESITE', 'Lax')
 CSRF_COOKIE_SAMESITE = os.environ.get('DJANGO_CSRF_COOKIE_SAMESITE', 'Lax')
 
-# Session Lifetime: 1 hour (3600 seconds)
+# Session Lifetime: 24 hours (86400 seconds)
 # Any activity within the session window will refresh the timer
-SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', 3600))  # 1 hour in seconds
+SESSION_COOKIE_AGE = int(os.environ.get('SESSION_COOKIE_AGE', 86400))  # 24 hours in seconds
 SESSION_SAVE_EVERY_REQUEST = True   # Refresh expiry timer on every active request
 SESSION_EXPIRE_AT_BROWSER_CLOSE = False  # Keep session alive even after browser close
 

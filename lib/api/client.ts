@@ -45,7 +45,7 @@ export async function apiClient<T>(
   try {
     const response = await fetch(url, requestOptions);
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401 && endpoint.includes('/auth/me/')) {
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/login')) {
         window.location.href = '/login?expired=true';
       }
