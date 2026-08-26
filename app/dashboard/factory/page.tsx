@@ -42,6 +42,7 @@ export default function DatasetFactoryPage() {
   });
   const [arxivWorkers, setArxivWorkers] = useState(4);
   const [arxivDelay, setArxivDelay] = useState(1.0);
+  const [arxivOutputDir, setArxivOutputDir] = useState("/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv");
   const [arxivJobId, setArxivJobId] = useState<string | null>(null);
   const [arxivStats, setArxivStats] = useState<any>(null);
   const [arxivStatus, setArxivStatus] = useState<string>("");
@@ -410,6 +411,23 @@ export default function DatasetFactoryPage() {
                 ))}
               </div>
 
+              {/* Output Directory Field (Google Drive / Colab Standard) */}
+              <div>
+                <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
+                  📁 Google Drive Storage Path
+                </label>
+                <input
+                  type="text"
+                  value={arxivOutputDir}
+                  onChange={(e) => setArxivOutputDir(e.target.value)}
+                  placeholder="/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv"
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', color: '#f8fafc', fontFamily: 'monospace', fontSize: '13px' }}
+                />
+                <p style={{ fontSize: '11px', color: '#94a3b8', marginTop: '6px', fontFamily: 'monospace' }}>
+                  Target structure: <span style={{ color: '#38bdf8' }}>{arxivOutputDir}/{arxivMonth.split('-')[0] || 'YYYY'}/pdf</span> &amp; <span style={{ color: '#38bdf8' }}>html</span>
+                </p>
+              </div>
+
               {/* Action Button */}
               <button
                 disabled={arxivRunning || !arxivCategory || !arxivMonth}
@@ -424,6 +442,7 @@ export default function DatasetFactoryPage() {
                       month: arxivMonth,
                       workers: arxivWorkers,
                       delay: arxivDelay,
+                      output_dir: arxivOutputDir,
                     });
                     if (data.job_id) {
                       setArxivJobId(data.job_id);

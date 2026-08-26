@@ -11,7 +11,33 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-ARXIV_OUTPUT_BASE = Path("/tmp/kaya_arxiv_downloads")
+COLAB_GDRIVE_BASE = Path("/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv")
+FALLBACK_LOCAL_BASE = Path("/tmp/kaya_arxiv_downloads")
+
+
+def resolve_arxiv_output_path(month_str: str, custom_dir: str = "") -> Path:
+    """
+    Resolves year-wise output directory matching Colab Drive format:
+    /content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv/<year>/[pdf|html]
+    """
+    import re
+    m = re.search(r"\b(19\d\d|20\d\d)\b", month_str)
+    year = m.group(1) if m else str(timezone.now().year)
+
+    if custom_dir:
+        base_path = Path(custom_dir)
+    else:
+        base_path = COLAB_GDRIVE_BASE
+
+    try:
+        out_path = base_path / year
+        out_path.mkdir(parents=True, exist_ok=True)
+    except Exception as exc:
+        logger.warning(f"[ARXIV OUTPUT] Cannot write to {base_path}: {exc}. Falling back to {FALLBACK_LOCAL_BASE}")
+        out_path = FALLBACK_LOCAL_BASE / year
+        out_path.mkdir(parents=True, exist_ok=True)
+
+    return out_path
 
 
 @shared_task(bind=True, max_retries=0, name="tasks.arxiv_batch_download")
@@ -48,12 +74,8 @@ def arxiv_batch_download_task(self_or_job_id, job_id: str = None, category: str 
         except Exception as exc:
             logger.warning(f"[ARXIV TASK] Could not fetch job {actual_job_id}: {exc}")
 
-    # Resolve output path
-    if not output_dir:
-        out_path = ARXIV_OUTPUT_BASE / actual_category.replace("/", "_") / actual_month
-    else:
-        out_path = Path(output_dir)
-    out_path.mkdir(parents=True, exist_ok=True)
+    # Resolve year-wise output path (/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv/<year>)
+    out_path = resolve_arxiv_output_path(actual_month, output_dir)
 
     # Stop event tied to job cancellation check
     stop_event = threading.Event()

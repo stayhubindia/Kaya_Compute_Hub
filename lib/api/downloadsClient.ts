@@ -90,7 +90,7 @@ export const downloadsClient = {
     });
   },
 
-  async startArxivBatch(payload: { category: string; month: string; workers?: number; delay?: number }, signal?: AbortSignal): Promise<any> {
+  async startArxivBatch(payload: { category: string; month: string; workers?: number; delay?: number; output_dir?: string }, signal?: AbortSignal): Promise<any> {
     return apiClient<any>('/arxiv/batch/start/', {
       method: 'POST',
       body: JSON.stringify(payload),

@@ -200,10 +200,11 @@ def arxiv_batch_start(request):
       workers   - Parallel threads 1-6  (default: 4)
       delay     - Inter-paper delay seconds  (default: 1.0)
     """
-    category = request.data.get("category", "").strip()
-    month    = request.data.get("month", "").strip()
-    workers  = int(request.data.get("workers", 4))
-    delay    = float(request.data.get("delay", 1.0))
+    category   = request.data.get("category", "").strip()
+    month      = request.data.get("month", "").strip()
+    workers    = int(request.data.get("workers", 4))
+    delay      = float(request.data.get("delay", 1.0))
+    output_dir = request.data.get("output_dir", "").strip()
 
     if not category:
         return Response({"error": {"message": "category is required."}}, status=status.HTTP_400_BAD_REQUEST)
@@ -222,6 +223,7 @@ def arxiv_batch_start(request):
             "month": month,
             "workers": workers,
             "delay": delay,
+            "output_dir": output_dir,
         }
     )
 
@@ -243,13 +245,14 @@ def arxiv_batch_start(request):
                 month=month,
                 workers=max(1, min(workers, 6)),
                 delay=max(0.0, delay),
+                output_dir=output_dir,
             )
         except Exception:
             # Fallback to daemon background thread if Celery broker is unavailable
             import threading
             t = threading.Thread(
                 target=arxiv_batch_download_task,
-                args=(str(job.id), category, month, max(1, min(workers, 6)), max(0.0, delay)),
+                args=(str(job.id), category, month, max(1, min(workers, 6)), max(0.0, delay), output_dir),
                 daemon=True
             )
             t.start()
