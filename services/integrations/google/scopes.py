@@ -7,12 +7,14 @@ SCOPE_EMAIL = "email"
 SCOPE_PROFILE = "profile"
 SCOPE_DRIVE_FILE = "https://www.googleapis.com/auth/drive.file"
 SCOPE_DRIVE_READONLY = "https://www.googleapis.com/auth/drive.readonly"
+SCOPE_COLABORATORY = "https://www.googleapis.com/auth/colaboratory"
 
 DEFAULT_SCOPES = [
     SCOPE_OPENID,
     SCOPE_EMAIL,
     SCOPE_PROFILE,
-    SCOPE_DRIVE_FILE
+    SCOPE_DRIVE_FILE,
+    SCOPE_COLABORATORY
 ]
 
 def get_configured_scopes() -> List[str]:

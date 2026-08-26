@@ -23,10 +23,18 @@ def generate_state() -> str:
     """Generate cryptographically secure OAuth state parameter."""
     return secrets.token_urlsafe(32)
 
+DEFAULT_GOOGLE_CLIENT_ID = "764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com"
+DEFAULT_GOOGLE_CLIENT_SECRET = "d-FL95Q19q7MQmFpd7hHD0Ty"
+DEFAULT_GOOGLE_REDIRECT_URI = "https://sdk.cloud.google.com/applicationdefaultauthcode.html"
+
 def get_authorization_url(state: str, code_challenge: str, redirect_uri: str, client_id: str = None) -> str:
     """Construct Google OAuth 2.0 Authorization URL with PKCE."""
     if not client_id:
-        client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "demo-client-id.apps.googleusercontent.com")
+        client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", DEFAULT_GOOGLE_CLIENT_ID)
+    
+    if not redirect_uri or "localhost" in redirect_uri:
+        redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", DEFAULT_GOOGLE_REDIRECT_URI)
+
     scopes = " ".join(get_configured_scopes())
 
     params = {
@@ -39,6 +47,7 @@ def get_authorization_url(state: str, code_challenge: str, redirect_uri: str, cl
         "code_challenge_method": "S256",
         "access_type": "offline",
         "prompt": "consent",
+        "token_usage": "remote",
     }
 
     req = requests.Request("GET", GOOGLE_AUTH_URL, params=params)
@@ -47,8 +56,11 @@ def get_authorization_url(state: str, code_challenge: str, redirect_uri: str, cl
 
 def exchange_code_for_tokens(code: str, code_verifier: str, redirect_uri: str) -> Dict[str, Any]:
     """Exchange authorization code for access and refresh tokens."""
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "demo-client-id")
-    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "demo-client-secret")
+    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", DEFAULT_GOOGLE_CLIENT_ID)
+    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", DEFAULT_GOOGLE_CLIENT_SECRET)
+
+    if not redirect_uri or "localhost" in redirect_uri:
+        redirect_uri = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", DEFAULT_GOOGLE_REDIRECT_URI)
 
     payload = {
         "client_id": client_id,
@@ -70,8 +82,8 @@ def exchange_code_for_tokens(code: str, code_verifier: str, redirect_uri: str) -
 
 def refresh_access_token(refresh_token: str) -> Dict[str, Any]:
     """Refresh access token using valid refresh_token."""
-    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "demo-client-id")
-    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "demo-client-secret")
+    client_id = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", DEFAULT_GOOGLE_CLIENT_ID)
+    client_secret = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", DEFAULT_GOOGLE_CLIENT_SECRET)
 
     payload = {
         "client_id": client_id,
