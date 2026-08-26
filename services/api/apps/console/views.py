@@ -95,7 +95,7 @@ class CodeExecuteView(APIView):
                 },
                 status=JobStatusChoices.QUEUED,
                 progress_percentage=0,
-                progress_stage="queued"
+                current_stage="queued"
             )
             try:
                 execute_job.apply_async(args=[str(job.id)])
