@@ -312,33 +312,39 @@ def google_account_verify(request, pk):
 
     try:
         refresh_token = account.get_refresh_token()
-        if not refresh_token:
-            account.status = AccountStatusChoices.EXPIRED
+        access_token = account.get_access_token()
+
+        # Check if local vault file exists
+        safe_filename = (account.email or "").replace("@", "_at_")
+        vault_file = Path.home() / f".config/colab-cli/saved_accounts/{safe_filename}.json"
+
+        if refresh_token:
+            try:
+                tokens = refresh_access_token(refresh_token)
+                new_access = tokens.get('access_token')
+                expires_in = tokens.get('expires_in', 3600)
+                account.set_access_token(new_access)
+                account.token_expiry = timezone.now() + timedelta(seconds=expires_in)
+            except Exception:
+                pass
+
+        if access_token or refresh_token or vault_file.exists():
+            account.status = AccountStatusChoices.ACTIVE
+            account.last_verified_at = timezone.now()
             account.save()
-            return Response({"status": "expired", "message": "No refresh token available."})
 
-        tokens = refresh_access_token(refresh_token)
-        access_token = tokens.get('access_token')
-        expires_in = tokens.get('expires_in', 3600)
-        account.set_access_token(access_token)
-        account.token_expiry = timezone.now() + timedelta(seconds=expires_in)
-        account.status = AccountStatusChoices.ACTIVE
-        account.last_verified_at = timezone.now()
+            log_audit_event(
+                action="auth.google_account_verified",
+                resource_type="connected_account",
+                resource_id=str(account.id),
+                actor=request.user,
+                request=request
+            )
+            return Response({"status": "active", "last_verified_at": account.last_verified_at})
+
+        account.status = AccountStatusChoices.EXPIRED
         account.save()
-
-        log_audit_event(
-            action="auth.google_account_verified",
-            resource_type="connected_account",
-            resource_id=str(account.id),
-            actor=request.user,
-            request=request
-        )
-
-        return Response({"status": "active", "last_verified_at": account.last_verified_at})
-    except TokenRevokedError:
-        account.status = AccountStatusChoices.REVOKED
-        account.save()
-        return Response({"status": "revoked", "message": "Refresh token was revoked by Google."})
+        return Response({"status": "expired", "message": "No valid token or Vault file available."})
     except Exception as e:
         account.status = AccountStatusChoices.ERROR
         account.save()
