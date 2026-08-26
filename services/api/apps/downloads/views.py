@@ -247,12 +247,19 @@ def arxiv_batch_start(request):
                 delay=max(0.0, delay),
                 output_dir=output_dir,
             )
-        except Exception:
-            # Fallback to daemon background thread if Celery broker is unavailable
+        except Exception as exc:
             import threading
             t = threading.Thread(
                 target=arxiv_batch_download_task,
-                args=(str(job.id), category, month, max(1, min(workers, 6)), max(0.0, delay), output_dir),
+                kwargs={
+                    "self": None,
+                    "job_id": str(job.id),
+                    "category": category,
+                    "month": month,
+                    "workers": max(1, min(workers, 6)),
+                    "delay": max(0.0, delay),
+                    "output_dir": output_dir
+                },
                 daemon=True
             )
             t.start()

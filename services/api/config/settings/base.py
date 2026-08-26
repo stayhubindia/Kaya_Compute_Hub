@@ -171,6 +171,12 @@ CELERY_TASK_SOFT_TIME_LIMIT = int(os.environ.get('CELERY_TASK_SOFT_TIME_LIMIT', 
 
 CELERY_TASK_ALWAYS_EAGER = os.environ.get('CELERY_TASK_ALWAYS_EAGER', 'False').lower() in ('true', '1', 'yes')
 
+CELERY_IMPORTS = (
+    'services.downloader.tasks.arxiv_tasks',
+    'services.worker.tasks.job_tasks',
+    'services.worker.tasks.heartbeat_tasks',
+)
+
 # Django REST Framework Settings
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [

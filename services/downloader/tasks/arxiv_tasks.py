@@ -41,26 +41,21 @@ def resolve_arxiv_output_path(month_str: str, custom_dir: str = "") -> Path:
 
 
 @shared_task(bind=True, max_retries=0, name="tasks.arxiv_batch_download")
-def arxiv_batch_download_task(self_or_job_id, job_id: str = None, category: str = "", month: str = "",
+def arxiv_batch_download_task(self, job_id: str = "", category: str = "", month: str = "",
                                workers: int = 4, delay: float = 1.0, output_dir: str = ""):
     """
     Task to run a full ArXiv batch download (discover + download).
-    Supports both Celery task execution (.delay()) and direct Thread execution.
+    Supports both Celery task execution (.delay()) and direct execution.
     """
-    # Disambiguate arguments between Celery bound task and direct call
-    if isinstance(self_or_job_id, str):
-        # Direct function call: self_or_job_id is job_id
-        actual_job_id = self_or_job_id
-        actual_category = job_id or ""
-        actual_month = category or ""
-        actual_workers = month if isinstance(month, int) else workers
-        actual_delay = workers if isinstance(workers, (int, float)) else delay
-    else:
-        actual_job_id = job_id
-        actual_category = category
-        actual_month = month
-        actual_workers = workers
-        actual_delay = delay
+    if isinstance(self, str) and not job_id:
+        job_id = self
+        self = None
+
+    actual_job_id = job_id
+    actual_category = category
+    actual_month = month
+    actual_workers = workers
+    actual_delay = delay
 
     from apps.jobs.models import Job, JobStatusChoices
 
