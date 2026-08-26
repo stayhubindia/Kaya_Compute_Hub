@@ -43,7 +43,7 @@ export default function ConnectionsSettingsPage() {
       setError(null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load connected accounts.');
-    } fontally {
+    } finally {
       setIsLoading(false);
     }
   };
