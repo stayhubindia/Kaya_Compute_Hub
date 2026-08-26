@@ -25,14 +25,6 @@ export interface DriveFile {
 }
 
 export const integrationsClient = {
-  startGoogleOAuth: async (redirectUri?: string, clientId?: string): Promise<{ authorization_url: string; state: string }> => {
-    const params = new URLSearchParams();
-    if (redirectUri) params.append('redirect_uri', redirectUri);
-    if (clientId) params.append('client_id', clientId);
-    const query = params.toString() ? `?${params.toString()}` : '';
-    return api.get<{ authorization_url: string; state: string }>(`/integrations/google/start/${query}`);
-  },
-
   listConnectedAccounts: async (): Promise<ConnectedAccount[]> => {
     const res = await api.get<{ results: ConnectedAccount[] }>('/integrations/google/accounts/');
     return res.results || [];
@@ -42,21 +34,12 @@ export const integrationsClient = {
     return api.post<ConnectedAccount>('/integrations/google/direct-connect/', data);
   },
 
-  verifyGoogleAuthCode: async (data: { code: string; state?: string; email?: string }): Promise<ConnectedAccount> => {
-    return api.post<ConnectedAccount>('/integrations/google/verify-code/', data);
-  },
-
   verifyAccount: async (accountId: string): Promise<{ status: string; last_verified_at?: string; message?: string }> => {
     return api.post<{ status: string; last_verified_at?: string; message?: string }>(`/integrations/google/${accountId}/verify/`);
   },
 
   disconnectAccount: async (accountId: string): Promise<{ status: string; id: string }> => {
     return api.post<{ status: string; id: string }>(`/integrations/google/${accountId}/disconnect/`);
-  },
-
-  reconnectAccount: async (accountId: string, redirectUri?: string): Promise<{ authorization_url: string; state: string }> => {
-    const query = redirectUri ? `?redirect_uri=${encodeURIComponent(redirectUri)}` : '';
-    return api.post<{ authorization_url: string; state: string }>(`/integrations/google/${accountId}/reconnect/${query}`);
   },
 
   revokeAccount: async (accountId: string): Promise<{ status: string; id: string }> => {
