@@ -80,11 +80,11 @@ function LoginForm() {
           </label>
           <input
             id="email-input"
-            type="email"
+            type="text"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@example.com"
+            placeholder="admin@kaya.local"
             style={{
               width: '100%',
               padding: '10px 14px',
