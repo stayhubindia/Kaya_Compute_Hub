@@ -212,10 +212,11 @@ def arxiv_batch_start(request):
 
     from apps.jobs.models import Job, JobTypeChoices, JobStatusChoices
     job = Job.objects.create(
+        name=f"ArXiv Download: {category} ({month})",
         created_by=request.user,
         job_type=JobTypeChoices.DOWNLOAD,
         status=JobStatusChoices.QUEUED,
-        metadata={
+        payload={
             "source": "arxiv_batch",
             "category": category,
             "month": month,
@@ -234,17 +235,27 @@ def arxiv_batch_start(request):
     )
 
     try:
-        from services.worker.tasks.arxiv_tasks import arxiv_batch_download_task
-        arxiv_batch_download_task.delay(
-            job_id=str(job.id),
-            category=category,
-            month=month,
-            workers=max(1, min(workers, 6)),
-            delay=max(0.0, delay),
-        )
+        from services.downloader.tasks.arxiv_tasks import arxiv_batch_download_task
+        try:
+            arxiv_batch_download_task.delay(
+                job_id=str(job.id),
+                category=category,
+                month=month,
+                workers=max(1, min(workers, 6)),
+                delay=max(0.0, delay),
+            )
+        except Exception:
+            # Fallback to daemon background thread if Celery broker is unavailable
+            import threading
+            t = threading.Thread(
+                target=arxiv_batch_download_task,
+                args=(str(job.id), category, month, max(1, min(workers, 6)), max(0.0, delay)),
+                daemon=True
+            )
+            t.start()
     except Exception as exc:
-        job.metadata["task_error"] = str(exc)
-        job.save(update_fields=["metadata"])
+        job.payload["task_error"] = str(exc)
+        job.save(update_fields=["payload"])
 
     return Response({
         "job_id": str(job.id),
@@ -266,14 +277,14 @@ def arxiv_batch_status(request, job_id: str):
     except Job.DoesNotExist:
         return Response({"error": {"message": "Job not found."}}, status=status.HTTP_404_NOT_FOUND)
 
-    arxiv_stats = (job.metadata or {}).get("arxiv_stats", {})
+    arxiv_stats = (job.payload or {}).get("arxiv_stats", {})
     return Response({
         "job_id": str(job.id),
         "status": job.status,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
-        "category": job.metadata.get("category"),
-        "month": job.metadata.get("month"),
+        "category": (job.payload or {}).get("category"),
+        "month": (job.payload or {}).get("month"),
         "arxiv_stats": arxiv_stats,
         "output_dir": arxiv_stats.get("output_dir", ""),
     })
