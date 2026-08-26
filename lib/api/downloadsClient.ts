@@ -89,4 +89,19 @@ export const downloadsClient = {
       signal,
     });
   },
+
+  async startArxivBatch(payload: { category: string; month: string; workers?: number; delay?: number }, signal?: AbortSignal): Promise<any> {
+    return apiClient<any>('/arxiv/batch/start/', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+      signal,
+    });
+  },
+
+  async getArxivBatchStatus(jobId: string, signal?: AbortSignal): Promise<any> {
+    return apiClient<any>(`/arxiv/batch/${jobId}/status/`, {
+      method: 'GET',
+      signal,
+    });
+  },
 };

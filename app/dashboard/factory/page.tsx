@@ -5,6 +5,7 @@ import DashboardNavbar from "@/components/DashboardNavbar";
 import { User, authClient } from "@/lib/api/authClient";
 import { Job, jobsClient } from "@/lib/api/jobsClient";
 import { integrationsClient, ConnectedAccount } from "@/lib/api/integrations-client";
+import { downloadsClient } from "@/lib/api/downloadsClient";
 import Link from "next/link";
 
 interface PipelinePayload {
@@ -418,13 +419,12 @@ export default function DatasetFactoryPage() {
                   setArxivStatus("Queuing batch download job...");
                   setArxivLogs([`[→] Starting ArXiv batch: ${arxivCategory} / ${arxivMonth}`]);
                   try {
-                    const res = await fetch("/api/v1/arxiv/batch/start/", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      credentials: "include",
-                      body: JSON.stringify({ category: arxivCategory, month: arxivMonth, workers: arxivWorkers, delay: arxivDelay })
+                    const data = await downloadsClient.startArxivBatch({
+                      category: arxivCategory,
+                      month: arxivMonth,
+                      workers: arxivWorkers,
+                      delay: arxivDelay,
                     });
-                    const data = await res.json();
                     if (data.job_id) {
                       setArxivJobId(data.job_id);
                       setArxivStatus(`✅ Job queued: ${data.job_id.slice(0,8)}...`);
@@ -432,8 +432,7 @@ export default function DatasetFactoryPage() {
                       // Poll progress every 5s
                       const poll = setInterval(async () => {
                         try {
-                          const sr = await fetch(`/api/v1/arxiv/batch/${data.job_id}/status/`, { credentials: "include" });
-                          const sd = await sr.json();
+                          const sd = await downloadsClient.getArxivBatchStatus(data.job_id);
                           const st = sd.arxiv_stats || {};
                           setArxivStats(st);
                           setArxivStatus(`[${sd.status?.toUpperCase()}] ${st.processed || 0}/${st.total || '?'} papers | HTML: ${st.html || 0} PDF: ${st.pdf || 0}`);

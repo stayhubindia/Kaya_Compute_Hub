@@ -182,10 +182,12 @@ class DownloadViewSet(viewsets.ModelViewSet):
 
 # ─── ArXiv Batch Download API ───────────────────────────────────────────────
 
+from django.views.decorators.csrf import csrf_exempt
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 
 
+@csrf_exempt
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def arxiv_batch_start(request):
