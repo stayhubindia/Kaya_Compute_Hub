@@ -93,7 +93,7 @@ class CodeExecuteView(APIView):
                     "target_dir": target_dir,
                     "script_name": script_name
                 },
-                status=JobStatusChoices.PENDING,
+                status=JobStatusChoices.QUEUED,
                 progress_percentage=0,
                 progress_stage="queued"
             )
