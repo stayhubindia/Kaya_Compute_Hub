@@ -1,0 +1,37 @@
+# Source Manifest for Qwen3-4B Conversational Dataset (Phase 2.3.1)
+# Declaratively lists all registered training data sources and their provenance.
+
+sources:
+  - source_id: internal-python-v1
+    source_type: human_authored
+    name: Internal Python Examples
+    description: Curated high-quality internal Python engineering examples.
+    version: "1.0"
+    license: null
+    created_at: "2026-08-11T00:00:00Z"
+
+  - source_id: synthetic-pilot-v1
+    source_type: synthetic
+    name: Synthetic Pilot Dataset
+    description: Pilot synthetic dataset generated for domain coverage.
+    version: "1.0"
+    generator: sample_test_generator
+    generator_version: "1.0.0"
+    license: null
+    created_at: "2026-08-11T00:00:00Z"
+
+  - source_id: curated-linux-docs-v1
+    source_type: documentation
+    name: Linux Kernel & Systems Reference
+    description: Structured documentation reference for Linux kernel and systems engineering.
+    version: "1.0"
+    license: null
+    created_at: "2026-08-11T00:00:00Z"
+
+  - source_id: benchmark-eval-v1
+    source_type: benchmark
+    name: Standard Benchmark Evaluation Fixture
+    description: Ground-truth benchmark fixture for evaluation and validation.
+    version: "1.0"
+    license: null
+    created_at: "2026-08-11T00:00:00Z"

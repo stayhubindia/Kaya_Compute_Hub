@@ -1,0 +1,14 @@
+{
+  "run_id": "50fc84c5-87d0-4806-84a4-ba44f31e6a6d",
+  "stage_name": "generate_statistics",
+  "output_path": "storage/datasets/50fc84c5-87d0-4806-84a4-ba44f31e6a6d/stage_3_generate_statistics/input_data.csv",
+  "checksum": "3675de7b9d398467d75f09a8aca489660e2fa54e417a42d45f36507c1b5c2889",
+  "metrics": {
+    "file_count": 1,
+    "total_bytes": 36,
+    "row_count": 3,
+    "missing_values": 0,
+    "empty_rows": 0
+  },
+  "valid": true
+}

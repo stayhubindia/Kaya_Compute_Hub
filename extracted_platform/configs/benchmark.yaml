@@ -1,0 +1,67 @@
+# Phase 4.5 — Independent Benchmark Suite Configuration
+benchmark_version: "benchmark-v1.0"
+target_count: 500
+seed: 42
+lifecycle: "FROZEN"
+
+# 13 Canonical Domains
+domain_targets:
+  programming: 0.16
+  software_engineering: 0.10
+  cybersecurity: 0.10
+  linux_systems: 0.08
+  networking: 0.08
+  ai_ml: 0.08
+  mathematics: 0.08
+  science: 0.06
+  psychology: 0.06
+  human_behavior: 0.06
+  reasoning: 0.06
+  technology: 0.04
+  general_knowledge: 0.04
+
+# 4 Difficulty Tiers
+difficulty_targets:
+  beginner: 0.25
+  intermediate: 0.40
+  advanced: 0.25
+  expert: 0.10
+
+# Canonical Evaluation Types
+evaluation_types:
+  - "deterministic"
+  - "reference_based"
+  - "structural"
+  - "code_based"
+  - "numerical"
+  - "reasoning"
+  - "qualitative"
+
+# Data Leakage & Contamination Prevention
+leakage_prevention:
+  check_exact_prompt: true
+  check_exact_content: true
+  check_near_duplicate: true
+  similarity_threshold: 0.85
+  excluded_dataset_splits:
+    - "datasets/production/processed/train.jsonl"
+    - "datasets/production/processed/validation.jsonl"
+    - "datasets/production/processed/test.jsonl"
+
+# Deterministic Evaluation Generation Settings (Locked for Base & Adapter)
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  top_k: 50
+  max_new_tokens: 512
+  repetition_penalty: 1.05
+  do_sample: false
+  seed: 42
+
+# Storage Layout
+storage:
+  base_dir: "benchmarks/benchmark-v1.0"
+  benchmark_file: "benchmarks/benchmark-v1.0/benchmark.jsonl"
+  manifest_file: "benchmarks/benchmark-v1.0/manifest.json"
+  statistics_file: "benchmarks/benchmark-v1.0/statistics.json"
+  readme_file: "benchmarks/benchmark-v1.0/README.md"

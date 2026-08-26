@@ -1,0 +1,98 @@
+# Production Training Specification for Qwen3-4B-Base Fine-Tuning
+# Phase 4.2 — Production QLoRA Supervised Fine-Tuning Engine
+
+model:
+  name: "Qwen/Qwen3-4B-Base"
+  path: "/content/drive/MyDrive/GoogleColab/AI/Qwen3/models/Qwen3-4B-Base"
+  fallback_pretrained_id: null
+  trust_remote_code: true
+  torch_dtype: "auto"
+
+dataset:
+  version: "dataset-v1.0"
+  lifecycle: "FROZEN"
+  manifest_path: "datasets/production/manifests/production_manifest.json"
+  candidate_file: "datasets/production/processed/candidate_dataset.jsonl"
+  train_file: "datasets/production/processed/train.jsonl"
+  validation_file: "datasets/production/processed/validation.jsonl"
+  test_file: "datasets/production/processed/test.jsonl"
+  require_frozen: true
+  validate_sha256: true
+  split_ratios:
+    train: 0.90
+    validation: 0.05
+    test: 0.05
+
+quantization:
+  enabled: true
+  bits: 4
+  load_in_4bit: true
+  quant_type: "nf4"
+  use_double_quant: true
+  compute_dtype: "bfloat16"
+  fallback_compute_dtype: "float16"
+
+lora:
+  enabled: true
+  r: 16
+  alpha: 32
+  lora_alpha: 32
+  dropout: 0.05
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+  modules_to_save: null
+
+training:
+  output_dir: "/content/drive/MyDrive/GoogleColab/AI/Qwen3/training/dataset-v1.0/qlora-v1"
+  local_fallback_output_dir: "outputs/training/dataset-v1.0/qlora-v1"
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 2.0e-4
+  num_train_epochs: 3
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  gradient_checkpointing: true
+  mixed_precision: "auto"
+  seed: 42
+  dataloader_num_workers: 0
+  assistant_only_loss: true
+
+optimizer:
+  name: "paged_adamw_8bit"
+
+scheduler:
+  type: "cosine"
+
+sequence:
+  max_length: 4096
+
+evaluation:
+  enabled: true
+  strategy: "epoch"
+  eval_strategy: "epoch"
+  eval_steps: 25
+  per_device_eval_batch_size: 1
+  metrics:
+    - "loss"
+    - "perplexity"
+  domain_stratified: true
+  difficulty_stratified: true
+
+checkpoint:
+  enabled: true
+  save_strategy: "steps"
+  save_steps: 25
+  save_total_limit: 3
+  resume_enabled: true
+  resume_from_checkpoint: null
+  enforce_dataset_version_lock: true

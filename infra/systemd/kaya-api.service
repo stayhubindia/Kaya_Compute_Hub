@@ -1,0 +1,21 @@
+[Unit]
+Description=Kaya Compute Hub Django API (Low-Resource VM)
+After=network.target kaya-redis.service
+
+[Service]
+Type=simple
+User=durgesh
+WorkingDirectory=/home/durgesh/Desktop/Projects/Colab_Account_VM
+Environment="PATH=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin:/usr/bin"
+Environment="DJANGO_SETTINGS_MODULE=config.settings.base"
+ExecStart=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 2 --timeout 120
+Restart=always
+RestartSec=5s
+
+# Low-resource systemd limits (2GB RAM VM protection)
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=50
+
+[Install]
+WantedBy=multi-user.target

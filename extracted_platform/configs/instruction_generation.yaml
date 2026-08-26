@@ -1,0 +1,68 @@
+# Configuration for Phase 3.4 Scientific Knowledge to Instruction Dataset Generation Engine
+
+generation_pipeline:
+  version: "1.0.0"
+  seed: 42
+  max_examples_per_chunk: 2
+  max_examples_per_section: 4
+  min_chunk_tokens: 30
+  max_chunk_tokens: 2048
+
+quality:
+  min_quality_score: 0.85
+  preferred_quality_score: 0.90
+  fail_fast: false
+  weights:
+    correctness: 0.25
+    source_grounding: 0.25
+    relevance: 0.15
+    clarity: 0.10
+    completeness: 0.10
+    technical_accuracy: 0.15
+
+grounding:
+  min_grounding_score: 0.70
+  min_lexical_overlap: 0.25
+  require_equation_presence_for_derivations: true
+  require_numerical_check_for_calculations: true
+  reject_unsupported_claims: true
+
+deduplication:
+  enable_exact_dedup: true
+  enable_near_dedup: true
+  near_duplicate_threshold: 0.85
+  ngram_size: 3
+  hash_num: 64
+
+task_selection:
+  allow_multi_turn: true
+  max_dialogue_turns: 3
+  supported_tasks:
+    - explanation
+    - question_answering
+    - derivation
+    - calculation
+    - problem_solving
+    - proof
+    - reasoning
+    - comparison
+    - data_interpretation
+    - analysis
+    - summarization
+    - multi_turn
+
+rights:
+  enforce_license_gating: true
+  default_internal_only: true
+  unrestricted_licenses:
+    - CC-BY-4.0
+    - CC0-1.0
+    - MIT
+    - Apache-2.0
+    - BSD-3-Clause
+
+output:
+  default_output_dir: "datasets/instruction_candidates/v2"
+  save_individual_sources: true
+  save_combined: true
+  save_rejected_records: true

@@ -1,0 +1,605 @@
+# Domain Dataset Task Templates Manifest
+# Phase 2.3.2 — Domain Dataset Templates
+# Schema: TaskTemplate model validated by src/dataset/template_registry.py
+
+version: "1.0.0"
+
+templates:
+  # ============================================================================
+  # 1. PROGRAMMING TEMPLATES
+  # ============================================================================
+  - id: "programming_python_coding_beginner"
+    domain: "programming"
+    topic: "python"
+    task_type: "coding"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "implement_idiomatic_python_basics"
+    description: "Construct clean, idiomatic Python solutions using standard library tools and proper type annotations."
+    quality_requirements:
+      min_answer_length: 80
+      require_code_blocks: true
+      require_examples: true
+    prompt_guidelines:
+      - "Ask for standard library usage (e.g., collections, itertools, pathlib)."
+      - "Include input/output specification."
+
+  - id: "programming_python_debugging_intermediate"
+    domain: "programming"
+    topic: "python"
+    task_type: "debugging"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "diagnose_and_fix_python_runtime_defects"
+    description: "Identify subtle edge-case errors, mutable default arguments, or scope leaks in Python code and provide corrected implementations."
+    quality_requirements:
+      min_answer_length: 120
+      require_code_blocks: true
+      require_reasoning: true
+    prompt_guidelines:
+      - "Present a snippet with a logical or concurrency flaw."
+      - "Explain root cause and provide fixed code."
+
+  - id: "programming_c_cpp_memory_advanced"
+    domain: "programming"
+    topic: "c_cpp"
+    task_type: "code_review"
+    difficulty: "advanced"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "audit_cpp_memory_safety_and_raii"
+    description: "Review C++ code for pointer arithmetic, use-after-free, memory leaks, and enforce RAII and smart pointers."
+    quality_requirements:
+      min_answer_length: 150
+      require_code_blocks: true
+      require_reasoning: true
+
+  - id: "programming_algorithms_problem_solving_expert"
+    domain: "programming"
+    topic: "algorithms"
+    task_type: "problem_solving"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "solve_complex_algorithmic_challenges"
+    description: "Formulate optimal time and space complexity algorithms with asymptotic proof and edge case handling."
+    quality_requirements:
+      min_answer_length: 180
+      require_code_blocks: true
+      require_step_by_step: true
+
+  # ============================================================================
+  # 2. SOFTWARE ENGINEERING TEMPLATES
+  # ============================================================================
+  - id: "software_engineering_system_design_advanced"
+    domain: "software_engineering"
+    topic: "system_design"
+    task_type: "system_design"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "design_scalable_distributed_services"
+    description: "Architect scalable, highly available backend systems with load balancing, caching, data partitioning, and consistency guarantees."
+    quality_requirements:
+      min_answer_length: 200
+      require_reasoning: true
+      require_tradeoff_analysis: true
+
+  - id: "software_engineering_design_patterns_intermediate"
+    domain: "software_engineering"
+    topic: "design_patterns"
+    task_type: "refactoring"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "refactor_code_using_gang_of_four_patterns"
+    description: "Refactor rigid legacy code into decoupled architectures using structural and behavioral design patterns."
+    quality_requirements:
+      min_answer_length: 120
+      require_code_blocks: true
+
+  - id: "software_engineering_ci_cd_scenario_analysis_intermediate"
+    domain: "software_engineering"
+    topic: "ci_cd"
+    task_type: "scenario_analysis"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "analyze_deployment_failure_modes"
+    description: "Evaluate blue-green, canary, and rolling deployment strategies for zero-downtime microservice updates."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true
+
+  # ============================================================================
+  # 3. CYBERSECURITY TEMPLATES
+  # ============================================================================
+  - id: "cybersecurity_cryptography_explanation_intermediate"
+    domain: "cybersecurity"
+    topic: "cryptography"
+    task_type: "explanation"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "explain_cryptographic_primitives_and_key_exchange"
+    description: "Detail cryptographic mechanisms (such as Diffie-Hellman, AES-GCM, RSA, HMAC) and mathematical security foundations."
+    quality_requirements:
+      min_answer_length: 120
+      require_reasoning: true
+
+  - id: "cybersecurity_vulnerability_analysis_advanced"
+    domain: "cybersecurity"
+    topic: "vulnerability_analysis"
+    task_type: "debugging"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "analyze_vulnerabilities_and_remediations"
+    description: "Analyze buffer overflows, race conditions, SQL injections, or CSRF flaws and formulate secure mitigations."
+    quality_requirements:
+      min_answer_length: 150
+      require_code_blocks: true
+      require_reasoning: true
+
+  - id: "cybersecurity_reverse_engineering_expert"
+    domain: "cybersecurity"
+    topic: "reverse_engineering"
+    task_type: "analysis"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "disassemble_and_decompile_binary_constructs"
+    description: "Dissect x86_64 and ARM assembly, calling conventions, stack frames, and binary packing techniques."
+    quality_requirements:
+      min_answer_length: 160
+      require_code_blocks: true
+      require_reasoning: true
+
+  # ============================================================================
+  # 4. LINUX / SYSTEMS TEMPLATES
+  # ============================================================================
+  - id: "linux_systems_filesystem_permissions_beginner"
+    domain: "linux_systems"
+    topic: "filesystem_permissions"
+    task_type: "explanation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "explain_linux_permissions_and_acls"
+    description: "Explain POSIX file modes, octal permissions, setuid/setgid, sticky bits, and Access Control Lists."
+    quality_requirements:
+      min_answer_length: 100
+      require_examples: true
+
+  - id: "linux_systems_process_signals_intermediate"
+    domain: "linux_systems"
+    topic: "process_management"
+    task_type: "troubleshooting"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "diagnose_process_lifecycle_and_signals"
+    description: "Explain process states (zombie, orphan, uninterruptible sleep D-state) and POSIX signal propagation (SIGTERM vs SIGKILL)."
+    quality_requirements:
+      min_answer_length: 120
+      require_reasoning: true
+
+  - id: "linux_systems_systemd_services_troubleshooting_intermediate"
+    domain: "linux_systems"
+    topic: "systemd_services"
+    task_type: "troubleshooting"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "debug_systemd_unit_failures"
+    description: "Analyze systemd unit dependency cycles, journalctl logs, Restart directives, and sandbox restrictions."
+    quality_requirements:
+      min_answer_length: 120
+      require_code_blocks: true
+      require_reasoning: true
+
+  - id: "linux_systems_kernel_internals_memory_advanced"
+    domain: "linux_systems"
+    topic: "kernel_internals"
+    task_type: "explanation"
+    difficulty: "advanced"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "explain_virtual_memory_paging_and_swap"
+    description: "Detail the Linux kernel page cache, dirty page writeback heuristics, hugepages, SLAB allocator, and OOM killer mechanics."
+    quality_requirements:
+      min_answer_length: 160
+      require_reasoning: true
+
+  - id: "linux_systems_bash_automation_coding_intermediate"
+    domain: "linux_systems"
+    topic: "bash_scripting"
+    task_type: "code_generation"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "author_robust_bash_automation_scripts"
+    description: "Write production-grade bash scripts utilizing strict error modes (set -euo pipefail), traps, and defensive parameter expansion."
+    quality_requirements:
+      min_answer_length: 100
+      require_code_blocks: true
+
+  # ============================================================================
+  # 5. NETWORKING TEMPLATES
+  # ============================================================================
+  - id: "networking_osi_tcpip_explanation_beginner"
+    domain: "networking"
+    topic: "osi_tcpip"
+    task_type: "explanation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "explain_network_encapsulation_and_layers"
+    description: "Map protocols to OSI 7-layer model and TCP/IP stack, explaining encapsulation, headers, and protocol boundaries."
+    quality_requirements:
+      min_answer_length: 100
+      require_examples: true
+
+  - id: "networking_tcp_udp_troubleshooting_advanced"
+    domain: "networking"
+    topic: "tcp_udp"
+    task_type: "troubleshooting"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "diagnose_tcp_handshake_and_congestion_anomalies"
+    description: "Analyze TCP 3-way handshake, SYN flood, TIME_WAIT socket states, TCP window scale, slow start, and packet retransmissions."
+    quality_requirements:
+      min_answer_length: 150
+      require_reasoning: true
+
+  - id: "networking_dns_http_packet_analysis_intermediate"
+    domain: "networking"
+    topic: "packet_analysis"
+    task_type: "analysis"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "analyze_pcap_traffic_and_http_tls_exchanges"
+    description: "Interpret tcpdump and Wireshark capture traces, DNS resolution queries, TLS 1.3 ClientHello/ServerHello handshakes, and SNI."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true
+
+  - id: "networking_routing_switching_expert"
+    domain: "networking"
+    topic: "routing_switching"
+    task_type: "problem_solving"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "solve_complex_bgp_ospf_routing_scenarios"
+    description: "Formulate route convergence, autonomous system path selection, split-horizon, and VLAN trunking configurations."
+    quality_requirements:
+      min_answer_length: 170
+      require_reasoning: true
+
+  # ============================================================================
+  # 6. AI / ML TEMPLATES
+  # ============================================================================
+  - id: "ai_ml_transformers_attention_explanation_intermediate"
+    domain: "ai_ml"
+    topic: "transformers_attention"
+    task_type: "explanation"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "explain_scaled_dot_product_and_multihead_attention"
+    description: "Deconstruct the Transformer architecture Query-Key-Value projection, softmax attention scaling, causal masking, and positional encodings."
+    quality_requirements:
+      min_answer_length: 140
+      require_reasoning: true
+
+  - id: "ai_ml_qlora_peft_coding_advanced"
+    domain: "ai_ml"
+    topic: "qlora_peft"
+    task_type: "coding"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "implement_qlora_finetuning_pipeline"
+    description: "Construct a modular PyTorch + Hugging Face PEFT training loop with 4-bit NormalFloat quantization, LoRA target modules, and gradient checkpointing."
+    quality_requirements:
+      min_answer_length: 160
+      require_code_blocks: true
+      require_reasoning: true
+
+  - id: "ai_ml_model_optimization_gpu_expert"
+    domain: "ai_ml"
+    topic: "gpu_computing"
+    task_type: "system_design"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "optimize_distributed_llm_inference_and_kernel_execution"
+    description: "Architect FlashAttention, KV cache management (PagedAttention), tensor parallelism, and CUDA stream concurrency."
+    quality_requirements:
+      min_answer_length: 180
+      require_reasoning: true
+      require_tradeoff_analysis: true
+
+  - id: "ai_ml_nlp_model_evaluation_intermediate"
+    domain: "ai_ml"
+    topic: "model_evaluation"
+    task_type: "comparison"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "compare_llm_evaluation_metrics"
+    description: "Evaluate perplexity, BLEU, ROUGE, exact match, and human evaluation benchmarks for generative NLP models."
+    quality_requirements:
+      min_answer_length: 120
+      require_reasoning: true
+
+  # ============================================================================
+  # 7. MATHEMATICS TEMPLATES
+  # ============================================================================
+  - id: "mathematics_linear_algebra_calculation_beginner"
+    domain: "mathematics"
+    topic: "linear_algebra"
+    task_type: "calculation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "calculate_matrix_operations_and_determinants"
+    description: "Compute matrix multiplications, determinants, matrix inversions, and vector dot/cross products with explicit arithmetic steps."
+    quality_requirements:
+      min_answer_length: 90
+      require_step_by_step: true
+
+  - id: "mathematics_calculus_optimization_intermediate"
+    domain: "mathematics"
+    topic: "calculus"
+    task_type: "problem_solving"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "solve_constrained_optimization_and_gradients"
+    description: "Solve multivariable calculus problems using gradients, Jacobians, Hessians, and Lagrange multipliers."
+    quality_requirements:
+      min_answer_length: 130
+      require_step_by_step: true
+      require_reasoning: true
+
+  - id: "mathematics_logic_proofs_advanced"
+    domain: "mathematics"
+    topic: "logic_proofs"
+    task_type: "proof"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "construct_formal_mathematical_proofs"
+    description: "Author rigorous deductive proofs using direct proof, proof by contradiction, induction, or contrapositive methods."
+    quality_requirements:
+      min_answer_length: 150
+      require_step_by_step: true
+      require_reasoning: true
+
+  - id: "mathematics_probability_statistics_expert"
+    domain: "mathematics"
+    topic: "probability_statistics"
+    task_type: "calculation"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "solve_bayesian_inference_and_stochastic_processes"
+    description: "Compute Bayesian posterior distributions, Markov chain stationary distributions, and maximum likelihood estimators."
+    quality_requirements:
+      min_answer_length: 160
+      require_step_by_step: true
+
+  # ============================================================================
+  # 8. SCIENCE TEMPLATES
+  # ============================================================================
+  - id: "science_physics_conceptual_explanation_beginner"
+    domain: "science"
+    topic: "physics"
+    task_type: "explanation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "explain_classical_mechanics_and_thermodynamics"
+    description: "Explain physical laws (Newtonian dynamics, energy conservation, entropy) with conceptual clarity and real-world systems."
+    quality_requirements:
+      min_answer_length: 100
+      require_examples: true
+
+  - id: "science_data_interpretation_intermediate"
+    domain: "science"
+    topic: "data_interpretation"
+    task_type: "data_interpretation"
+    difficulty: "intermediate"
+    supported_difficulties: ["intermediate", "advanced"]
+    objective: "interpret_experimental_datasets_and_significance"
+    description: "Analyze tabular experimental measurements, statistical p-values, error bars, and deduce valid empirical conclusions."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true
+
+  - id: "science_scientific_reasoning_advanced"
+    domain: "science"
+    topic: "scientific_reasoning"
+    task_type: "reasoning"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "evaluate_hypotheses_and_confounding_variables"
+    description: "Scrutinize experimental designs, identify confounding variables, selection biases, and formulate falsifiable test setups."
+    quality_requirements:
+      min_answer_length: 150
+      require_reasoning: true
+
+  # ============================================================================
+  # 9. PSYCHOLOGY TEMPLATES
+  # ============================================================================
+  - id: "psychology_cognitive_biases_explanation_beginner"
+    domain: "psychology"
+    topic: "cognitive_biases"
+    task_type: "explanation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "explain_heuristics_and_systematic_biases"
+    description: "Explain cognitive heuristics (anchoring, availability heuristic, confirmation bias, loss aversion) with empirical examples."
+    quality_requirements:
+      min_answer_length: 100
+      require_examples: true
+
+  - id: "psychology_memory_learning_analysis_intermediate"
+    domain: "psychology"
+    topic: "memory_learning"
+    task_type: "analysis"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "analyze_memory_consolidation_and_retrieval_mechanisms"
+    description: "Analyze working memory limits, long-term potentiation, spacing effects, and cognitive load theory."
+    quality_requirements:
+      min_answer_length: 120
+      require_reasoning: true
+
+  - id: "psychology_decision_making_scenario_analysis_advanced"
+    domain: "psychology"
+    topic: "decision_making"
+    task_type: "scenario_analysis"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "analyze_high_stakes_decision_architecture"
+    description: "Evaluate risk assessment, dual-process theory (System 1 vs System 2), and stress-induced cognitive tunnel vision in critical scenarios."
+    quality_requirements:
+      min_answer_length: 140
+      require_reasoning: true
+
+  # ============================================================================
+  # 10. HUMAN BEHAVIOUR TEMPLATES
+  # ============================================================================
+  - id: "human_behavior_conflict_negotiation_intermediate"
+    domain: "human_behavior"
+    topic: "conflict_negotiation"
+    task_type: "scenario_analysis"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "evaluate_principled_negotiation_strategies"
+    description: "Analyze BATNA (Best Alternative to a Negotiated Agreement), integrative vs distributive bargaining, and de-escalation tactics."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true
+
+  - id: "human_behavior_social_engineering_awareness_advanced"
+    domain: "human_behavior"
+    topic: "social_engineering_awareness"
+    task_type: "analysis"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "recognize_manipulation_and_pretexting_vectors"
+    description: "Dissect psychological manipulation techniques (urgency, authority, reciprocity, social proof) and structure organizational defenses."
+    quality_requirements:
+      min_answer_length: 140
+      require_reasoning: true
+
+  - id: "human_behavior_group_dynamics_leadership_intermediate"
+    domain: "human_behavior"
+    topic: "group_dynamics_leadership"
+    task_type: "decision_analysis"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "assess_groupthink_and_collective_decision_making"
+    description: "Identify symptoms of groupthink, diffusion of responsibility, psychological safety, and implement constructive dissent mechanisms."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true
+
+  # ============================================================================
+  # 11. REASONING TEMPLATES
+  # ============================================================================
+  - id: "reasoning_deductive_reasoning_beginner"
+    domain: "reasoning"
+    topic: "deductive_reasoning"
+    task_type: "reasoning"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "perform_syllogistic_and_propositional_deduction"
+    description: "Formulate and evaluate valid deductive arguments from premises, recognizing formal fallacies (affirming the consequent, denying the antecedent)."
+    quality_requirements:
+      min_answer_length: 100
+      require_step_by_step: true
+
+  - id: "reasoning_causal_counterfactual_advanced"
+    domain: "reasoning"
+    topic: "causal_counterfactual"
+    task_type: "reasoning"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "evaluate_causal_graphs_and_counterfactual_hypotheses"
+    description: "Differentiate correlation from causation using Pearls causal ladder (association, intervention, counterfactuals)."
+    quality_requirements:
+      min_answer_length: 150
+      require_reasoning: true
+
+  - id: "reasoning_trade_off_decision_analysis_advanced"
+    domain: "reasoning"
+    topic: "trade_off_analysis"
+    task_type: "decision_analysis"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "structure_multi_criteria_decision_matrices"
+    description: "Decompose complex engineering and strategic problems into weighted trade-off matrices, quantifying risks, upside, and uncertainties."
+    quality_requirements:
+      min_answer_length: 150
+      require_reasoning: true
+      require_tradeoff_analysis: true
+
+  - id: "reasoning_constraint_solving_problem_solving_expert"
+    domain: "reasoning"
+    topic: "constraint_solving"
+    task_type: "problem_solving"
+    difficulty: "expert"
+    supported_difficulties: ["advanced", "expert"]
+    objective: "solve_complex_logical_and_satisfiability_constraints"
+    description: "Systematically solve SAT and CSP problems through backtracking, forward checking, constraint propagation, and invariant validation."
+    quality_requirements:
+      min_answer_length: 160
+      require_step_by_step: true
+
+  # ============================================================================
+  # 12. TECHNOLOGY TEMPLATES
+  # ============================================================================
+  - id: "technology_docker_kubernetes_explanation_intermediate"
+    domain: "technology"
+    topic: "docker_kubernetes"
+    task_type: "explanation"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "explain_container_namespaces_cgroups_and_k8s_pods"
+    description: "Detail Linux cgroups and namespaces isolation in containers, and Kubernetes pod scheduling, services, and ingress controllers."
+    quality_requirements:
+      min_answer_length: 120
+      require_examples: true
+
+  - id: "technology_databases_comparison_advanced"
+    domain: "technology"
+    topic: "databases"
+    task_type: "comparison"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "compare_relational_vs_nosql_vs_lsm_storage_engines"
+    description: "Compare B-Tree vs LSM-Tree storage architectures, ACID vs BASE guarantees, and write amplification vs read latency trade-offs."
+    quality_requirements:
+      min_answer_length: 150
+      require_reasoning: true
+      require_tradeoff_analysis: true
+
+  - id: "technology_cloud_infrastructure_system_design_advanced"
+    domain: "technology"
+    topic: "cloud_infrastructure"
+    task_type: "system_design"
+    difficulty: "advanced"
+    supported_difficulties: ["intermediate", "advanced", "expert"]
+    objective: "architect_multi_region_cloud_topologies"
+    description: "Design active-active multi-region cloud infrastructures with geo-DNS routing, database replication topologies, and disaster recovery."
+    quality_requirements:
+      min_answer_length: 170
+      require_reasoning: true
+
+  # ============================================================================
+  # 13. GENERAL KNOWLEDGE TEMPLATES
+  # ============================================================================
+  - id: "general_knowledge_history_of_tech_explanation_beginner"
+    domain: "general_knowledge"
+    topic: "history_of_tech"
+    task_type: "explanation"
+    difficulty: "beginner"
+    supported_difficulties: ["beginner", "intermediate"]
+    objective: "trace_milestones_in_computing_history"
+    description: "Trace historical breakthroughs in computing (Turing machines, transistor development, UNIX, ARPANET, World Wide Web)."
+    quality_requirements:
+      min_answer_length: 100
+      require_examples: true
+
+  - id: "general_knowledge_interdisciplinary_synthesis_intermediate"
+    domain: "general_knowledge"
+    topic: "interdisciplinary_synthesis"
+    task_type: "comparison"
+    difficulty: "intermediate"
+    supported_difficulties: ["beginner", "intermediate", "advanced"]
+    objective: "synthesize_cross_domain_scientific_and_economic_impacts"
+    description: "Synthesize the intersection of technological advancement, macroeconomic policy, energy infrastructure, and societal transformation."
+    quality_requirements:
+      min_answer_length: 130
+      require_reasoning: true

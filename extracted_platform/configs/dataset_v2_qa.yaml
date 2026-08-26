@@ -1,0 +1,103 @@
+# Dataset-v2.0 QA, Balancing, and Freeze Configuration
+version: "dataset-v2.0"
+pipeline_version: "2.0.0"
+
+# Target dataset sizing options
+sizing:
+  default_target: 10000
+  supported_targets: [1000, 5000, 10000, 25000, 50000, 100000]
+  allow_oversampling: false
+  shortage_policy: "strict_report"  # "strict_report" stops with explicit shortage report, does not fabricate
+
+# Stratified Split Ratios (Deterministic)
+splits:
+  train: 0.90
+  validation: 0.05
+  test: 0.05
+  seed: 42
+  source_group_clustering: true  # Prevent source-chunk co-occurrence across train/eval
+
+# Quality Thresholds
+quality:
+  minimum_score: 0.85
+  preferred_score: 0.90
+  require_100_percent_provenance: true
+
+# Deduplication Thresholds
+deduplication:
+  near_duplicate_threshold: 0.85
+  max_duplicate_rate: 0.05
+
+# Rights & License Policies
+rights:
+  # Permitted licenses for public/release builds
+  allowed_licenses:
+    - "CC-BY-4.0"
+    - "CC-BY-SA-4.0"
+    - "CC-BY-NC-SA-4.0"
+    - "CC-BY-NC-4.0"
+    - "CC0"
+    - "MIT"
+    - "Apache-2.0"
+    - "PUBLIC_DOMAIN"
+    - "ARXIV_NONCOMMERCIAL"
+    - "NPTEL_EDUCATIONAL"
+    - "UNKNOWN"  # Allowed for internal research, logged in rights audit
+  allow_unknown_license: true
+  quarantine_unauthorized: true
+
+# Authoritative 13-Domain Taxonomy Weights
+domains:
+  programming: 0.15
+  software_engineering: 0.10
+  cybersecurity: 0.08
+  linux_systems: 0.08
+  networking: 0.07
+  ai_ml: 0.10
+  mathematics: 0.08
+  science: 0.12
+  psychology: 0.04
+  human_behavior: 0.04
+  reasoning: 0.06
+  technology: 0.05
+  general_knowledge: 0.03
+
+# Difficulty Tiers
+difficulties:
+  beginner: 0.25
+  intermediate: 0.40
+  advanced: 0.25
+  expert: 0.10
+
+# Readiness Scorecard Mandatory Release Gates
+release_gates:
+  schema_validity:
+    threshold: 1.00
+    critical: true
+  provenance_completeness:
+    threshold: 1.00
+    critical: true
+  rights_compliance:
+    threshold: 1.00
+    critical: true
+  exact_cross_split_leakage:
+    threshold: 0
+    critical: true
+  near_cross_split_leakage:
+    threshold: 0
+    critical: true
+  scientific_correctness:
+    threshold: 0
+    critical: true
+  quality_minimum:
+    threshold: 0.85
+    critical: true
+  duplicate_rate:
+    threshold: 0.05
+    critical: true
+  manifest_integrity:
+    threshold: true
+    critical: true
+  checksums_verified:
+    threshold: true
+    critical: true

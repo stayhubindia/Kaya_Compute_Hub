@@ -1,0 +1,173 @@
+# Phase 3.3 — Document Ingestion Configuration
+# Specifies parameters for PDF/HTML extraction, normalization, section parsing,
+# chunking, license tracking, quality auditing, and deduplication.
+
+version: "1.0.0"
+seed: 42
+
+discovery:
+  supported_extensions:
+    - .pdf
+    - .html
+    - .htm
+    - .json
+    - .jsonl
+  ignored_directories:
+    - .git
+    - __pycache__
+    - .pytest_cache
+    - .venv
+    - node_modules
+    - .cache
+  ignored_extensions:
+    - .pyc
+    - .tmp
+    - .part
+    - .lock
+    - .metadata
+    - .ids
+    - .log
+
+pdf_extraction:
+  ocr_detection_threshold_chars_per_page: 50
+  preserve_page_numbers: true
+  max_pages_per_doc: 2000
+  extract_metadata: true
+  extract_equations: true
+  extract_tables: true
+
+html_extraction:
+  parser: "lxml"
+  strip_elements:
+    - nav
+    - header
+    - footer
+    - aside
+    - script
+    - style
+    - noscript
+    - iframe
+    - form
+    - button
+    - svg
+  math_selectors:
+    - math
+    - span.math
+    - span.katex
+    - div.arithmatex
+    - span.MathJax
+
+normalization:
+  unicode_form: "NFKC"
+  dehyphenate_wrapped_words: true
+  strip_running_headers: true
+  strip_page_numbers: true
+  normalize_whitespace: true
+
+section_detection:
+  academic_sections:
+    - abstract
+    - introduction
+    - background
+    - literature_review
+    - methodology
+    - model
+    - theory
+    - experimental_setup
+    - experiments
+    - results
+    - discussion
+    - conclusion
+    - future_work
+    - acknowledgments
+    - references
+    - appendix
+  nptel_sections:
+    - course_overview
+    - module
+    - week
+    - lecture
+    - lesson
+    - unit
+    - chapter
+    - topic
+    - summary
+    - assignment
+    - quiz
+    - tutorial
+
+chunking:
+  min_chunk_tokens: 100
+  max_chunk_tokens: 1024
+  chunk_overlap: 50
+  token_estimation_ratio: 0.75  # ~4 chars per token estimate
+
+domains:
+  default_domain: "science"
+  default_topic: "physics"
+  taxonomy:
+    - programming
+    - software_engineering
+    - cybersecurity
+    - linux_systems
+    - networking
+    - ai_ml
+    - mathematics
+    - science
+    - psychology
+    - human_behavior
+    - reasoning
+    - technology
+    - general_knowledge
+  subtopic_mappings:
+    astrophysics:
+      domain: "science"
+      topic: "physics"
+      subtopic: "astrophysics"
+    quantum:
+      domain: "science"
+      topic: "physics"
+      subtopic: "quantum_mechanics"
+    thermodynamics:
+      domain: "science"
+      topic: "physics"
+      subtopic: "thermodynamics"
+    electromagnetism:
+      domain: "science"
+      topic: "physics"
+      subtopic: "electromagnetism"
+    mechanics:
+      domain: "science"
+      topic: "physics"
+      subtopic: "classical_mechanics"
+
+licensing:
+  default_unknown_status: "UNKNOWN"
+  enforce_internal_only_on_unknown: true
+  recognized_licenses:
+    - "CC-BY-4.0"
+    - "CC-BY-SA-4.0"
+    - "CC-BY-NC-SA-4.0"
+    - "CC-BY-NC-4.0"
+    - "CC0-1.0"
+    - "Apache-2.0"
+    - "MIT"
+    - "arXiv Non-exclusive License"
+    - "NPTEL Open Access"
+
+quality:
+  minimum_doc_chars: 100
+  minimum_chunk_chars: 50
+  max_repeated_line_ratio: 0.20
+  min_quality_score: 0.85
+  preferred_quality_score: 0.90
+
+deduplication:
+  exact_hash: "sha256"
+  enable_near_dedup: true
+  near_duplicate_threshold: 0.85
+  ngram_size: 3
+
+checkpointing:
+  save_every_n_docs: 10
+  atomic_write: true

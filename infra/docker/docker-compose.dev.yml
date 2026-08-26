@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: kaya-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-kaya_db}
+      POSTGRES_USER: ${POSTGRES_USER:-kaya_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-kaya_password}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-kaya_user} -d ${POSTGRES_DB:-kaya_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: kaya-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: kaya-api
+    restart: unless-stopped
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DJANGO_SECRET_KEY: dev-secret-key-placeholder
+      DJANGO_DEBUG: "True"
+      DATABASE_URL: postgres://kaya_user:kaya_password@postgres:5432/kaya_db
+      REDIS_URL: redis://redis:6379/0
+      ALLOWED_HOSTS: "localhost,127.0.0.1,api"
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../../storage:/app/storage
+
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile.api
+    container_name: kaya-worker
+    restart: unless-stopped
+    command: celery -A services.worker.celery_app worker --loglevel=info -c 2
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.development
+      DATABASE_URL: postgres://kaya_user:kaya_password@postgres:5432/kaya_db
+      REDIS_URL: redis://redis:6379/0
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ../../storage:/app/storage
+    user: "1000:1000"
+
+volumes:
+  postgres_data:
+  redis_data:

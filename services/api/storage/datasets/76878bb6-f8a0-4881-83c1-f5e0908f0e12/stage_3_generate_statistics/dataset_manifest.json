@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "dataset_id": "ba1d521c-9142-46d5-80df-e3e8888fcf7f",
+  "file_count": 1,
+  "total_bytes": 36,
+  "checksum": "3675de7b9d398467d75f09a8aca489660e2fa54e417a42d45f36507c1b5c2889",
+  "format": "csv",
+  "columns": [
+    "id",
+    "text"
+  ],
+  "statistics": {
+    "file_count": 1,
+    "total_bytes": 36,
+    "row_count": 3,
+    "missing_values": 0,
+    "empty_rows": 0
+  },
+  "provenance": {
+    "pipeline_id": "dba3878f-6d22-4284-983a-b93af86dfbf8",
+    "pipeline_name": "Cleaning Pipeline",
+    "pipeline_version": "1.0.0",
+    "source_dataset_id": "14d1c527-a886-43bf-8e0b-880f647f56bb",
+    "source_dataset_uri": "/tmp/pytest-of-durgesh/pytest-20/test_create_and_execute_proces0/input_data.csv",
+    "processing_run_id": "76878bb6-f8a0-4881-83c1-f5e0908f0e12"
+  }
+}

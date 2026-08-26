@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+.venv/
+env/
+venv/
+ENV/
+
+# Next.js Build Outputs
+.next/
+out/
+build/
+dist/
+
+# Python compiled files & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Storage Runtime Rules (Never commit datasets, models, logs, checkpoints, temp files)
+storage/datasets/*
+!storage/datasets/.gitkeep
+storage/artifacts/*
+!storage/artifacts/.gitkeep
+storage/checkpoints/*
+!storage/checkpoints/.gitkeep
+storage/logs/*
+!storage/logs/.gitkeep
+storage/tmp/*
+!storage/tmp/.gitkeep
+
+# Models & Weights
+*.bin
+*.pth
+*.pt
+*.onnx
+*.safetensors
+*.h5
+*.tflite
+
+# Logs & Database
+*.log
+*.sqlite3
+*.db
+
+# Environment, Secrets, Tokens, Cookies & Keys
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+*.pfx
+secrets/
+tokens/
+cookies/
+oauth_tokens.json
+
+# IDE & System files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

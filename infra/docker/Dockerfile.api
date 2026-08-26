@@ -1,0 +1,23 @@
+FROM python:3.13-slim
+
+WORKDIR /app
+
+# Install system runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    libpq-dev \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend requirements & install dependencies
+COPY services/api/pyproject.toml /app/services/api/pyproject.toml
+RUN pip install --no-cache-dir django djangorestframework django-filter psycopg2-binary dj-database-url python-dotenv redis celery pytest pytest-django
+
+# Copy codebase
+COPY . /app
+
+ENV PYTHONPATH="/app:/app/services/api:/app/services/worker"
+EXPOSE 8000
+
+CMD ["python", "services/api/manage.py", "runserver", "0.0.0.0:8000"]

@@ -1,0 +1,59 @@
+# Production Evaluation Specification for Qwen3-4B-Base Benchmarking
+# Phase 4.4 — Evaluation & Benchmarking Architecture
+
+model:
+  name: "Qwen/Qwen3-4B-Base"
+  model_type: "base"  # "base" or "adapter"
+  base_model_path: "/content/drive/MyDrive/GoogleColab/AI/Qwen3/models/Qwen3-4B-Base"
+  adapter_path: "/content/drive/MyDrive/GoogleColab/AI/Qwen3/training/dataset-v1.0/qlora-v1/checkpoints/best"
+  local_fallback_base_path: "models/Qwen3-4B-Base"
+  local_fallback_adapter_path: "outputs/training/dataset-v1.0/qlora-v1/checkpoints/best"
+  fallback_pretrained_id: null
+  trust_remote_code: true
+  torch_dtype: "auto"
+  device_map: "auto"
+
+dataset:
+  version: "dataset-v1.0"
+  lifecycle: "FROZEN"
+  manifest_path: "datasets/production/manifests/production_manifest.json"
+  train_file: "datasets/production/processed/train.jsonl"
+  validation_file: "datasets/production/processed/validation.jsonl"
+  test_file: "datasets/production/processed/test.jsonl"
+  split: "test"
+  require_frozen: true
+  validate_sha256: true
+  max_examples: null
+
+generation:
+  max_new_tokens: 512
+  temperature: 0.7
+  top_p: 0.9
+  top_k: 50
+  repetition_penalty: 1.1
+  do_sample: false  # Deterministic evaluation by default
+  stop_strings:
+    - "<|im_end|>"
+    - "<|endoftext|>"
+
+metrics:
+  compute_deterministic: true
+  compute_repetition: true
+  compute_formatting: true
+  compute_task_matching: true
+  n_gram_sizes:
+    - 2
+    - 3
+    - 4
+
+regression:
+  tolerance_pct: 5.0
+  critical_metrics:
+    - "validity_rate"
+    - "empty_rate"
+    - "repetition_ratio"
+    - "formatting_score"
+
+output_dir: "outputs/evaluation"
+reports_dir: "reports"
+seed: 42

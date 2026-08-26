@@ -1,0 +1,405 @@
+# Dataset Specification for Qwen3-4B Fine-Tuning
+# Phase 2.1 — Dataset Specification
+
+model:
+  name: Qwen/Qwen3-4B-Base
+  training_method: qlora
+
+format:
+  type: conversational_messages
+  supports_multiturn: true
+  schema:
+    record:
+      messages:
+        type: array
+        items:
+          role:
+            type: string
+            enum: [system, user, assistant]
+          content:
+            type: string
+      metadata:
+        type: object
+        required:
+          - domain
+          - topic
+          - task_type
+          - difficulty
+          - quality_score
+          - source
+          - source_type
+          - created_at
+
+domains:
+  programming:
+    description: Core programming languages, paradigms, syntax, and idioms
+    subtopics:
+      - python
+      - javascript
+      - c_cpp
+      - dart_flutter
+      - go
+      - rust
+      - algorithms
+      - data_structures
+  software_engineering:
+    description: Software architecture, design patterns, testing, and lifecycle
+    subtopics:
+      - system_design
+      - api_design
+      - design_patterns
+      - refactoring
+      - testing
+      - ci_cd
+  cybersecurity:
+    description: Security principles, vulnerability analysis, cryptography, and reverse engineering
+    subtopics:
+      - cryptography
+      - reverse_engineering
+      - vulnerability_analysis
+      - secure_coding
+      - threat_modeling
+      - forensics
+  linux_systems:
+    description: Linux internals, shell scripting, process management, storage, and administration
+    subtopics:
+      - filesystem_permissions
+      - process_management
+      - memory_cpu
+      - storage
+      - networking
+      - ssh_security
+      - systemd_services
+      - logs_monitoring
+      - package_management
+      - bash_scripting
+      - performance_troubleshooting
+      - system_troubleshooting
+      - automation
+      - kernel_internals
+  networking:
+    description: Network protocols, architectures, socket programming, and troubleshooting
+    subtopics:
+      - osi_tcpip
+      - ipv4_ipv6
+      - tcp_udp
+      - dns_dhcp
+      - routing_switching
+      - firewalls_vpn
+      - http_tls
+      - sockets_ports
+      - packet_analysis
+      - network_troubleshooting
+      - network_performance
+  ai_ml:
+    description: Artificial intelligence, machine learning algorithms, and deep learning architectures
+    subtopics:
+      - ml_fundamentals
+      - deep_learning
+      - transformers_attention
+      - tokenization_embeddings
+      - llms_finetuning
+      - qlora_peft
+      - quantization_inference
+      - model_evaluation
+      - computer_vision
+      - nlp
+      - reinforcement_learning
+      - model_optimization
+      - gpu_computing
+      - pytorch_huggingface
+  mathematics:
+    description: Mathematical foundations for computation, proofs, calculation, and science
+    subtopics:
+      - arithmetic_algebra
+      - geometry_trigonometry
+      - calculus
+      - linear_algebra
+      - probability_statistics
+      - discrete_math
+      - graph_theory
+      - optimization
+      - logic_proofs
+      - numerical_methods
+  science:
+    description: Scientific principles, quantitative problems, reasoning, and computational sciences
+    subtopics:
+      - physics
+      - chemistry
+      - biology
+      - earth_astronomy
+      - computer_science
+      - scientific_reasoning
+      - data_interpretation
+      - experimental_design
+  psychology:
+    description: Cognitive psychology, perception, biases, and behavioral mechanisms
+    subtopics:
+      - cognitive_psychology
+      - memory_learning
+      - attention_perception
+      - decision_making
+      - behavioral_psychology
+      - cognitive_biases
+      - emotion_motivation
+      - social_psychology
+      - behavioral_science
+      - research_methodology
+  human_behavior:
+    description: Social dynamics, communication structures, negotiation, and group behavior
+    subtopics:
+      - communication_interaction
+      - conflict_negotiation
+      - persuasion_influence
+      - group_dynamics_leadership
+      - trust_cooperation
+      - bias_manipulation_recognition
+      - social_engineering_awareness
+      - behavioural_patterns
+  reasoning:
+    description: Structured problem solving, deduction, decision analysis, and root cause investigation
+    subtopics:
+      - deductive_reasoning
+      - inductive_abductive
+      - causal_counterfactual
+      - constraint_solving
+      - pattern_recognition
+      - trade_off_analysis
+      - decision_analysis
+      - problem_decomposition
+      - critical_thinking
+      - error_analysis
+  technology:
+    description: Hardware, cloud infrastructure, distributed systems, and emerging technologies
+    subtopics:
+      - os_hardware
+      - cpus_gpus_memory
+      - cloud_infrastructure
+      - virtualization_containers
+      - docker_kubernetes
+      - databases
+      - web_mobile_tech
+      - developer_tools
+      - system_architecture
+      - emerging_tech
+  general_knowledge:
+    description: Broad interdisciplinary knowledge, technological history, and domain overviews
+    subtopics:
+      - history_of_tech
+      - geography_culture
+      - economics_civics
+      - environment_energy
+      - everyday_science
+      - interdisciplinary_synthesis
+
+domain_targets:
+  programming: 0.182
+  software_engineering: 0.091
+  cybersecurity: 0.136
+  linux_systems: 0.091
+  networking: 0.073
+  ai_ml: 0.073
+  mathematics: 0.045
+  science: 0.045
+  psychology: 0.045
+  human_behavior: 0.045
+  reasoning: 0.064
+  technology: 0.045
+  general_knowledge: 0.065
+
+task_types:
+  - explanation
+  - question_answering
+  - coding
+  - code_generation
+  - code_completion
+  - debugging
+  - code_review
+  - refactoring
+  - troubleshooting
+  - system_design
+  - reasoning
+  - comparison
+  - classification
+  - summarization
+  - analysis
+  - scenario_analysis
+  - decision_analysis
+  - multi_turn
+  - problem_solving
+  - proof
+  - calculation
+  - data_interpretation
+
+difficulty:
+  levels:
+    - beginner
+    - intermediate
+    - advanced
+    - expert
+  targets:
+    beginner: 0.25
+    intermediate: 0.40
+    advanced: 0.25
+    expert: 0.10
+
+quality:
+  minimum_score: 0.85
+  preferred_score: 0.90
+  dimensions:
+    - correctness
+    - relevance
+    - clarity
+    - completeness
+    - technical_accuracy
+    - reasoning_quality
+  engineering_standards:
+    factual_correctness: true
+    provenance_tracking: true
+    duplicate_prevention: true
+    pii_filtering: true
+    dataset_integrity: true
+
+split:
+  train: 0.90
+  validation: 0.05
+  test: 0.05
+
+metadata_schema:
+  fields:
+    domain:
+      type: string
+      required: true
+      description: Primary category from the domain taxonomy
+    topic:
+      type: string
+      required: true
+      description: Specific subtopic or subject area
+    task_type:
+      type: string
+      required: true
+      description: Type of interaction or task performed
+    difficulty:
+      type: string
+      required: true
+      enum: [beginner, intermediate, advanced, expert]
+    quality_score:
+      type: float
+      required: true
+      minimum: 0.0
+      maximum: 1.0
+    source:
+      type: string
+      required: true
+      description: Provenance or generator identifier
+    source_type:
+      type: string
+      required: true
+      description: Type of data source (e.g., synthetic, curated, benchmark)
+    created_at:
+      type: string
+      required: true
+      description: ISO 8601 UTC timestamp of creation
+
+paths:
+  raw: /content/drive/MyDrive/GoogleColab/AI/Qwen3/datasets/raw
+  processed: /content/drive/MyDrive/GoogleColab/AI/Qwen3/datasets/processed
+  train: /content/drive/MyDrive/GoogleColab/AI/Qwen3/datasets/train.jsonl
+  validation: /content/drive/MyDrive/GoogleColab/AI/Qwen3/datasets/validation.jsonl
+  test: /content/drive/MyDrive/GoogleColab/AI/Qwen3/datasets/test.jsonl
+
+pipeline:
+  version: "1.0.0"
+  random_seed: 42
+  cleaning:
+    min_message_chars: 10
+    max_message_chars: 65536
+    max_turns: 50
+    strict_alternating_roles: true
+  deduplication:
+    exact_hash: sha256
+    near_duplicate_threshold: 0.85
+    ngram_size: 3
+  quality:
+    enforce_threshold: true
+    fallback_unscored: false
+
+generation:
+  default_seed: 42
+  max_batch_size: 100
+  default_generator: sample
+  output_format: jsonl
+  raw_output_dir: datasets/raw/synthetic
+
+mixing:
+  seed: 42
+  strategy: proportional
+  allow_oversampling: false
+  allow_undersampling: true
+  preserve_source_provenance: true
+  enforce_domain_targets: true
+  enforce_task_targets: false
+  enforce_difficulty_targets: true
+
+pilot:
+  enabled: true
+  target_count: 1000
+  candidate_multiplier: 1.2
+  seed: 42
+  version: "pilot-v1"
+  output_dir: "datasets/pilot/v1"
+  readiness_thresholds:
+    min_quality_mean: 0.85
+    max_duplicate_rate: 0.05
+    min_provenance_rate: 1.0
+    max_leakage_records: 0
+    min_domain_coverage_count: 13
+    min_difficulty_coverage_count: 4
+
+production:
+  enabled: false
+  version: "dataset-v1.0"
+  target_count: 10000
+  seed: 42
+  candidate_multiplier: 1.20
+  batch_size: 500
+  output_dir: "datasets/production"
+  checkpoint_dir: "datasets/production/checkpoints"
+  reports_dir: "datasets/production/reports"
+  allow_oversampling: false
+  resume: true
+  fail_fast: false
+
+production_qa:
+  enabled: true
+  minimum_quality_score: 0.85
+  preferred_quality_score: 0.90
+  max_duplicate_rate: 0.05
+  require_provenance: true
+  require_all_domains: true
+  require_all_difficulties: true
+  leakage_check: true
+  token_analysis: true
+  require_token_analysis: false
+  max_sequence_length: 4096
+  truncation_warning_rate: 0.01
+  safety_margin_ratio: 0.90
+  tokenizer:
+    model_path: "/content/drive/MyDrive/GoogleColab/AI/Qwen3/models/Qwen3-4B-Base"
+  training_estimate:
+    epochs:
+      - 1
+      - 2
+      - 3
+    micro_batch_size: 1
+    gradient_accumulation_steps: 8
+  readiness:
+    minimum_final_records: 50
+    minimum_quality_mean: 0.85
+    preferred_quality_mean: 0.90
+
+
+
+
+
+

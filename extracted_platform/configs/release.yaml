@@ -1,0 +1,44 @@
+# Release Configuration for Qwen3-4B-Base LoRA Adapter Packaging
+# Phase 5.1 — QLoRA Adapter Packaging, Release Manifest & Reproducibility System
+
+release:
+  name: "qwen3-4b-qlora"
+  version: "v1.0"
+  output_dir: "releases"
+  default_release_id: "qwen3-4b-qlora-v1.0"
+
+model:
+  base_model_id: "Qwen/Qwen3-4B-Base"
+  expected_architecture: "Qwen3ForCausalLM"
+  adapter_type: "QLoRA"
+  peft_type: "LORA"
+  task_type: "CAUSAL_LM"
+
+lora:
+  r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+dataset:
+  version: "dataset-v1.0"
+  manifest_path: "datasets/production/manifests/production_manifest.json"
+  require_frozen: true
+
+training:
+  config_path: "configs/training.yaml"
+
+generation:
+  config_path: "configs/generation.yaml"
+
+benchmark:
+  version: "benchmark-v1.0"
+  manifest_path: "benchmarks/benchmark-v1.0/manifest.json"

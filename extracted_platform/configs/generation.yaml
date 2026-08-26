@@ -1,0 +1,12 @@
+# Generation Configuration for Benchmark Evaluation (Phase 4.7)
+# This configuration is strictly locked and hashed to ensure identical inference conditions
+# across baseline Qwen3-4B-Base and fine-tuned LoRA adapter evaluations.
+
+generation:
+  temperature: 0.0
+  top_p: 1.0
+  top_k: 50
+  max_new_tokens: 512
+  repetition_penalty: 1.05
+  do_sample: false
+  seed: 42

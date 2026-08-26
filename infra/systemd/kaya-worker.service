@@ -1,0 +1,21 @@
+[Unit]
+Description=Kaya Compute Hub Worker Service (Single Concurrency, SQLite Source of Truth)
+After=network.target kaya-redis.service
+
+[Service]
+Type=simple
+User=durgesh
+WorkingDirectory=/home/durgesh/Desktop/Projects/Colab_Account_VM
+Environment="PATH=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin:/usr/bin"
+Environment="PYTHONPATH=/home/durgesh/Desktop/Projects/Colab_Account_VM:/home/durgesh/Desktop/Projects/Colab_Account_VM/services/api"
+ExecStart=/home/durgesh/Desktop/Projects/Colab_Account_VM/.venv/bin/celery -A services.worker.celery_app worker -l info -c 1 --prefetch-multiplier=1
+Restart=always
+RestartSec=5s
+
+# Low-resource systemd limits (2GB RAM VM protection)
+MemoryMax=512M
+CPUQuota=100%
+TasksMax=50
+
+[Install]
+WantedBy=multi-user.target

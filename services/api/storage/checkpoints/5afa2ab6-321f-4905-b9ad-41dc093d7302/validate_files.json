@@ -1,0 +1,14 @@
+{
+  "run_id": "5afa2ab6-321f-4905-b9ad-41dc093d7302",
+  "stage_name": "validate_files",
+  "output_path": "storage/datasets/5afa2ab6-321f-4905-b9ad-41dc093d7302/stage_0_validate_files/input_data.csv",
+  "checksum": "70792e50f23ab6850a7090df6df295784bf2025ff0935ff3fc7b9abb7a2680d2",
+  "metrics": {
+    "total_files": 1,
+    "valid_files": 1,
+    "empty_files": 0,
+    "unreadable_files": 0,
+    "total_bytes": 32
+  },
+  "valid": true
+}

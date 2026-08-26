@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qwen AI Studio & QLoRA Mission Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="logo-icon">Q3</div>
+        <div class="brand-info">
+          <h1>Qwen AI Studio</h1>
+          <span class="subtext">QLoRA Production Mission Control</span>
+        </div>
+      </div>
+
+      <!-- Live Hardware Telemetry Pills -->
+      <div class="topbar-metrics">
+        <div class="metric-pill" id="pill-hardware">
+          <span class="pill-dot green"></span>
+          <span class="pill-label">Hardware:</span>
+          <strong id="val-gpu-name">NVIDIA Tesla T4</strong>
+        </div>
+        <div class="metric-pill" id="pill-vram">
+          <span class="pill-label">VRAM:</span>
+          <strong id="val-vram">2.95 / 14.56 GB</strong>
+          <div class="mini-progress-bar"><div class="mini-fill" id="vram-fill" style="width: 20%;"></div></div>
+        </div>
+        <div class="metric-pill" id="pill-cpu">
+          <span class="pill-label">CPU:</span>
+          <strong id="val-cpu">14%</strong>
+        </div>
+        <div class="metric-pill" id="pill-ram">
+          <span class="pill-label">RAM:</span>
+          <strong id="val-ram">4.2 / 16.0 GB</strong>
+        </div>
+        <div class="metric-pill" id="pill-status">
+          <span class="pill-dot blue" id="job-dot"></span>
+          <strong id="val-job-status">Ready</strong>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Navigation Bar -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-dashboard">📊 Dashboard</button>
+      <button class="nav-tab" data-tab="tab-ingest">📥 1. Ingest Docs</button>
+      <button class="nav-tab" data-tab="tab-generate">⚡ 2. Gen Candidates</button>
+      <button class="nav-tab" data-tab="tab-qa">🧹 3. QA & Clean</button>
+      <button class="nav-tab" data-tab="tab-split">🔒 4. Split & Freeze</button>
+      <button class="nav-tab" data-tab="tab-smoke">🚀 5. T4 Preflight</button>
+      <button class="nav-tab" data-tab="tab-train">🧠 6. QLoRA Train</button>
+      <button class="nav-tab" data-tab="tab-reports">📑 7. Sharable Reports</button>
+    </nav>
+
+    <!-- Main Workspace Container -->
+    <main class="main-content">
+      
+      <!-- TAB 0: DASHBOARD & TELEMETRY -->
+      <section class="tab-pane active" id="tab-dashboard">
+        <div class="grid-2-col">
+          <div class="card glass">
+            <div class="card-header">
+              <h2>⚡ Real-Time Training Telemetry</h2>
+              <span class="badge cyan" id="badge-heartbeat-state">FROZEN / READY</span>
+            </div>
+            <div class="stat-summary-row">
+              <div class="stat-box">
+                <span class="stat-lbl">Current Step</span>
+                <span class="stat-num" id="stat-step">540 / 828</span>
+              </div>
+              <div class="stat-box">
+                <span class="stat-lbl">Current Epoch</span>
+                <span class="stat-num" id="stat-epoch">1.96 / 3.0</span>
+              </div>
+              <div class="stat-box">
+                <span class="stat-lbl">Best Val Loss</span>
+                <span class="stat-num green" id="stat-best-loss">1.8925</span>
+              </div>
+              <div class="stat-box">
+                <span class="stat-lbl">Val Perplexity</span>
+                <span class="stat-num green" id="stat-val-ppl">6.64</span>
+              </div>
+            </div>
+
+            <!-- Canvas Dynamic Chart -->
+            <div class="chart-container">
+              <div class="chart-header">
+                <span>Validation Loss & Perplexity Trajectory</span>
+                <span class="chart-legend"><i class="dot-cyan"></i> Step Val Loss</span>
+              </div>
+              <canvas id="lossChart" width="600" height="220"></canvas>
+            </div>
+          </div>
+
+          <div class="card glass">
+            <div class="card-header">
+              <h2>🔒 Dataset & Checkpoint Status</h2>
+              <span class="badge green">Lifecycle: FROZEN</span>
+            </div>
+            <div class="dataset-stats-card">
+              <div class="row-between">
+                <span>Dataset Version:</span>
+                <strong>dataset-v2.0</strong>
+              </div>
+              <div class="row-between">
+                <span>Train Records (90%):</span>
+                <strong id="stat-train-count">2,206 records</strong>
+              </div>
+              <div class="row-between">
+                <span>Validation Records (5%):</span>
+                <strong id="stat-val-count">123 records</strong>
+              </div>
+              <div class="row-between">
+                <span>Test Records (5%):</span>
+                <strong id="stat-test-count">123 records</strong>
+              </div>
+              <div class="row-between">
+                <span>Train Split SHA-256:</span>
+                <code class="sha-pill">35b32dc1...fc16</code>
+              </div>
+            </div>
+
+            <div class="quick-actions-box">
+              <h3>Quick Operations</h3>
+              <div class="btn-group-grid">
+                <button class="btn btn-primary" onclick="switchTab('tab-train')">🚀 Open Training Controls</button>
+                <button class="btn btn-secondary" onclick="switchTab('tab-reports')">📑 View Sharable Report</button>
+                <button class="btn btn-outline" onclick="switchTab('tab-ingest')">📥 Ingest New PDFs</button>
+                <button class="btn btn-outline" onclick="refreshStatus()">🔄 Refresh Status</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 1: DOCUMENT INGESTION -->
+      <section class="tab-pane" id="tab-ingest">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>📥 Document Ingestion Engine (PDF / Docs / HTML / JSON)</h2>
+            <span class="badge">Phase 3.3 Knowledge Engine</span>
+          </div>
+          <p class="description-text">
+            Ingests domain PDFs, course transcripts, or Markdown archives, extracting semantic document chunks with metadata and source provenance.
+          </p>
+
+          <form id="form-ingest" class="config-form" onsubmit="handleIngest(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Input Document Path (File or Directory):</label>
+                <input type="text" id="ingest-input" value="data/fixtures/raw/fixture_dataset.jsonl" required>
+                <small>E.g. <code>data/fixtures/raw/fixture_dataset.jsonl</code> or <code>/path/to/pdf_folder</code></small>
+              </div>
+
+              <div class="form-group">
+                <label>Output Directory:</label>
+                <input type="text" id="ingest-output-dir" value="data/ingested/custom_corpus" required>
+              </div>
+
+              <div class="form-group">
+                <label>Source Identifier:</label>
+                <input type="text" id="ingest-source" value="domain_docs">
+              </div>
+
+              <div class="form-group">
+                <label>Input Format:</label>
+                <select id="ingest-format">
+                  <option value="auto" selected>Auto-detect (auto)</option>
+                  <option value="pdf">PDF (*.pdf)</option>
+                  <option value="html">HTML (*.html)</option>
+                  <option value="json">JSON / JSONL</option>
+                  <option value="mixed">Mixed corpus</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Parallel Workers:</label>
+                <input type="number" id="ingest-workers" value="4" min="1" max="16">
+              </div>
+
+              <div class="form-group checkbox-group">
+                <label><input type="checkbox" id="ingest-dry-run"> Dry Run (Scan files & verify without writing)</label>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">⚡ Start Ingestion Pipeline</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 2: SYNTHETIC GENERATION -->
+      <section class="tab-pane" id="tab-generate">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>⚡ Synthetic Instruction Dataset Generator</h2>
+            <span class="badge">Phase 2.3 Generation</span>
+          </div>
+          <p class="description-text">
+            Generates high-quality conversational instruction pairs formatted for Qwen ChatML syntax (`<|im_start|>user`, `<|im_start|>assistant`).
+          </p>
+
+          <form id="form-generate" class="config-form" onsubmit="handleGenerate(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Number of Examples to Generate:</label>
+                <input type="number" id="gen-count" value="300" min="1" max="5000">
+              </div>
+
+              <div class="form-group">
+                <label>Deterministic Random Seed:</label>
+                <input type="number" id="gen-seed" value="42">
+              </div>
+
+              <div class="form-group">
+                <label>Difficulty Tier:</label>
+                <select id="gen-difficulty">
+                  <option value="beginner">Beginner</option>
+                  <option value="intermediate" selected>Intermediate</option>
+                  <option value="advanced">Advanced</option>
+                  <option value="expert">Expert</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Destination File:</label>
+                <input type="text" id="gen-output" value="data/instruction_dataset/v2.0/raw/candidates.jsonl">
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">⚡ Generate Instruction Candidates</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 3: QA, CLEANING & DEDUPLICATION -->
+      <section class="tab-pane" id="tab-qa">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>🧹 QA Cleaning, Quality Scoring & Deduplication</h2>
+            <span class="badge">Phase 2.2 Quality Assurance</span>
+          </div>
+          <p class="description-text">
+            Evaluates syntax integrity, strips malformed ChatML tokens, computes semantic quality scores, and purges duplicates.
+          </p>
+
+          <form id="form-qa" class="config-form" onsubmit="handleQA(event)">
+            <div class="form-grid">
+              <div class="form-group">
+                <label>Input Candidates JSONL:</label>
+                <input type="text" id="qa-input" value="data/instruction_dataset/v2.0/raw/candidates.jsonl">
+              </div>
+
+              <div class="form-group">
+                <label>Output Accepted JSONL:</label>
+                <input type="text" id="qa-output" value="data/instruction_dataset/v2.0/processed/accepted.jsonl">
+              </div>
+
+              <div class="form-group">
+                <label>Minimum Quality Score Threshold (0.00 - 1.00):</label>
+                <input type="number" id="qa-score" value="0.90" step="0.01" min="0.50" max="1.00">
+                <small>Recommended: <strong>0.90</strong> for production fine-tuning</small>
+              </div>
+            </div>
+
+            <div class="form-actions">
+              <button type="submit" class="btn btn-primary">🧹 Run QA & Cleaning</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- TAB 4: SPLIT & FREEZE DATASET -->
+      <section class="tab-pane" id="tab-split">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>🔒 Dataset Splitting, Zero-Leakage Audit & Freezing</h2>
+            <span class="badge green">Strict 0-Leakage Gate</span>
+          </div>
+
+          <div class="grid-2-col">
+            <div>
+              <h3>1. Partition Dataset Splits</h3>
+              <form id="form-split" class="config-form" onsubmit="handleSplit(event)">
+                <div class="form-group">
+                  <label>Train Ratio:</label>
+                  <input type="number" id="split-train" value="0.90" step="0.01">
+                </div>
+                <div class="form-group">
+                  <label>Validation Ratio:</label>
+                  <input type="number" id="split-val" value="0.05" step="0.01">
+                </div>
+                <div class="form-group">
+                  <label>Test Ratio:</label>
+                  <input type="number" id="split-test" value="0.05" step="0.01">
+                </div>
+                <div class="form-group">
+                  <label>Random Seed:</label>
+                  <input type="number" id="split-seed" value="42">
+                </div>
+                <button type="submit" class="btn btn-primary">⚡ Build Deterministic Splits</button>
+              </form>
+            </div>
+
+            <div>
+              <h3>2. Cryptographic Audit & Freezing</h3>
+              <p class="description-text">
+                Verifies zero cross-split data leakage, generates SHA-256 digests, and permanently locks the lifecycle state to <strong>FROZEN</strong>.
+              </p>
+              <div class="freeze-box">
+                <div class="badge green">Current State: FROZEN</div>
+                <button class="btn btn-danger" onclick="handleFreeze()">🔒 Execute Zero-Leakage Audit & Freeze</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: COLAB T4 & PREFLIGHT SMOKE TEST -->
+      <section class="tab-pane" id="tab-smoke">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>🚀 Google Colab Tesla T4 Preflight & Smoke Test</h2>
+            <span class="badge cyan">Phase 4.2 Hardware Safety Gate</span>
+          </div>
+
+          <p class="description-text">
+            Executes a single live forward/backward step on the remote NVIDIA Tesla T4 GPU to verify 4-bit NF4 weights, gradient checkpointing, 33,030,144 LoRA parameters, zero base-model gradient leakage, and Google Drive checkpoint persistence.
+          </p>
+
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Target Colab Session:</label>
+              <input type="text" id="smoke-session" value="t4-prod">
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button class="btn btn-primary" onclick="handleSmokeTest()">🧪 Run Colab T4 Smoke Test</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 6: PRODUCTION QLORA TRAINING -->
+      <section class="tab-pane" id="tab-train">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>🧠 Phase 4.3 — Production QLoRA Fine-Tuning Execution</h2>
+            <span class="badge cyan">3 Epochs / 828 Steps / Auto-Resume</span>
+          </div>
+
+          <div class="hyperparam-grid">
+            <div class="param-card">
+              <span class="param-lbl">Base Model</span>
+              <strong class="param-val">Qwen/Qwen3-4B-Base</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-lbl">Trainable LoRA Params</span>
+              <strong class="param-val">33,030,144 (1.4753%)</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-lbl">LoRA Config</span>
+              <strong class="param-val">r=16, alpha=32, drop=0.05</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-lbl">Optimizer</span>
+              <strong class="param-val">PagedAdamW8bit (lr=2e-4)</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-lbl">Effective Batch Size</span>
+              <strong class="param-val">8 (Micro=1, Accum=8)</strong>
+            </div>
+            <div class="param-card">
+              <span class="param-lbl">Checkpointing</span>
+              <strong class="param-val">Every 25 Steps (Top 3 + Best)</strong>
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top: 24px;">
+            <button class="btn btn-primary btn-large" onclick="handleTrain()">🚀 Launch / Resume Production Training</button>
+            <button class="btn btn-secondary" onclick="handleColabManage('allocate')">⚡ Smart Multi-Account Failover</button>
+            <button class="btn btn-outline" onclick="handleColabManage('mount')">📂 Mount Google Drive</button>
+            <button class="btn btn-outline" onclick="handleColabManage('switch')">🔑 Switch Google Account</button>
+            <button class="btn btn-danger" onclick="handleColabManage('clear')">🗑️ Reset Auth Tokens</button>
+          </div>
+        </div>
+
+        <div class="card glass" style="margin-top: 20px;">
+          <div class="card-header">
+            <h2>⚡ Multi-Account Free Tier Failover Operations</h2>
+            <span class="badge green">Stateless Architecture</span>
+          </div>
+          <p class="description-text">
+            When Colab reaches free tier GPU quota limits (503 / 412), the multi-account manager archives active credentials, purges cached laptop sessions, and triggers fresh authentication across rotated accounts while retaining persistent checkpoints in Google Drive.
+          </p>
+          <div class="btn-group-grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
+            <button class="btn btn-secondary" onclick="handleColabManage('allocate')">🔄 Allocate & Auto-Resume</button>
+            <button class="btn btn-outline" onclick="handleColabManage('mount')">📂 Mount Google Drive</button>
+            <button class="btn btn-outline" onclick="handleColabManage('switch')">🔑 Switch to Next Account</button>
+            <button class="btn btn-outline" onclick="handleColabManage('clear')">🗑️ Clear Laptop Config</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 7: SHARABLE REPORTS -->
+      <section class="tab-pane" id="tab-reports">
+        <div class="card glass">
+          <div class="card-header">
+            <h2>📑 Publication-Grade Sharable Report Generator</h2>
+            <div class="btn-row">
+              <button class="btn btn-primary" onclick="generateAndExportReport()">🔄 Refresh & Synthesize Report</button>
+              <button class="btn btn-outline" onclick="printReport()">🖨 Print / Export PDF</button>
+            </div>
+          </div>
+
+          <div id="report-view-container" class="report-container">
+            <div class="loading-spinner">Click "Refresh & Synthesize Report" to load the latest publication report.</div>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Floating Live Terminal Console Drawer -->
+    <div class="console-drawer" id="console-drawer">
+      <div class="console-header">
+        <div class="console-title">
+          <span class="term-dot"></span>
+          <span>Live Process Console: <strong id="active-job-title">Idle</strong></span>
+        </div>
+        <div class="console-controls">
+          <button class="icon-btn" onclick="clearConsole()" title="Clear Console">🧹 Clear</button>
+          <button class="icon-btn" onclick="toggleConsole()" id="btn-toggle-console" title="Minimize/Maximize">▼</button>
+        </div>
+      </div>
+      <div class="console-body" id="console-body">
+        <div class="console-line system">[Ready] Qwen AI Studio Mission Control initialized. Select an action above to begin.</div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

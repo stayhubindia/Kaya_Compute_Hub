@@ -1,0 +1,17 @@
+{
+  "run_id": "50fc84c5-87d0-4806-84a4-ba44f31e6a6d",
+  "stage_name": "inspect_schema",
+  "output_path": "storage/datasets/50fc84c5-87d0-4806-84a4-ba44f31e6a6d/stage_1_inspect_schema/input_data.csv",
+  "checksum": "70792e50f23ab6850a7090df6df295784bf2025ff0935ff3fc7b9abb7a2680d2",
+  "metrics": {
+    "format": "csv",
+    "row_count": 3,
+    "columns": [
+      "id",
+      "text"
+    ],
+    "column_count": 2,
+    "malformed_rows": 0
+  },
+  "valid": true
+}

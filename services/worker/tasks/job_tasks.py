@@ -1,0 +1,78 @@
+import logging
+from celery import shared_task
+
+from apps.jobs.models import Job, JobStatusChoices
+from apps.jobs.services import transition_job_status, update_job_progress, claim_job_atomically
+from apps.audit.services import log_audit_event
+from services.worker.executors.demo_executor import run_approved_executor
+
+logger = logging.getLogger(__name__)
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+def execute_job(self, job_id: str, worker_name: str = "celery-worker-01"):
+    """
+    Celery task entrypoint for async job execution.
+    Handles atomic leasing, progress updates, state machine transitions, and safe demo execution.
+    """
+    logger.info(f"Received execute_job task for job_id={job_id}")
+
+    # 1. Atomically claim job
+    job, claimed = claim_job_atomically(job_id, worker_name=worker_name)
+    if not claimed or not job:
+        logger.warning(f"Job {job_id} could not be claimed (already claimed, cancelled, or missing).")
+        return {"status": "skipped", "reason": "job_already_claimed_or_missing"}
+
+    # 2. Check if cancelled before running
+    if job.status == JobStatusChoices.CANCELLED:
+        logger.info(f"Job {job_id} was cancelled before execution.")
+        return {"status": "cancelled"}
+
+    try:
+        # 3. Transition to running
+        transition_job_status(job, JobStatusChoices.RUNNING)
+
+        def progress_callback(pct: int, stage: str, msg: str):
+            # Check if job was cancelled during execution
+            current_job = Job.objects.get(id=job.id)
+            if current_job.status == JobStatusChoices.CANCELLED:
+                raise InterruptedError("Job execution cancelled by user request.")
+            update_job_progress(current_job, pct, stage, msg)
+
+        # 4. Run approved demo executor
+        output_result = run_approved_executor(job.job_type, job.payload or {}, progress_callback)
+
+        # 5. Transition to succeeded
+        transition_job_status(job, JobStatusChoices.SUCCEEDED)
+        log_audit_event(
+            action="job.completed",
+            resource_type="job",
+            resource_id=str(job.id),
+            metadata={"result": output_result}
+        )
+        return {"status": "succeeded", "result": output_result}
+
+    except InterruptedError as e:
+        logger.info(f"Job {job.id} cancelled during execution.")
+        log_audit_event(action="job.cancelled_in_flight", resource_type="job", resource_id=str(job.id))
+        return {"status": "cancelled"}
+
+    except NotImplementedError as e:
+        # Permanent failure (unsupported job type) -> do not retry
+        logger.error(f"Job {job.id} permanent error: {e}")
+        transition_job_status(job, JobStatusChoices.FAILED, error_code="NOT_IMPLEMENTED", error_message=str(e))
+        return {"status": "failed", "error": str(e)}
+
+    except Exception as exc:
+        logger.exception(f"Job {job.id} encountered exception: {exc}")
+        job.retry_count += 1
+        job.save()
+
+        # Bounded retries
+        if job.retry_count < job.max_retries:
+            transition_job_status(job, JobStatusChoices.FAILED, error_code="TRANSIENT_ERROR", error_message=str(exc))
+            transition_job_status(job, JobStatusChoices.RETRYING)
+            transition_job_status(job, JobStatusChoices.QUEUED)
+            raise self.retry(exc=exc, countdown=5 * (2 ** job.retry_count))
+        else:
+            transition_job_status(job, JobStatusChoices.FAILED, error_code="MAX_RETRIES_EXCEEDED", error_message=str(exc))
+            return {"status": "failed", "error": "Max retries exceeded"}

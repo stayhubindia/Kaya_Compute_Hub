@@ -1,0 +1,12 @@
+{
+  "run_id": "76878bb6-f8a0-4881-83c1-f5e0908f0e12",
+  "stage_name": "deduplicate",
+  "output_path": "storage/datasets/76878bb6-f8a0-4881-83c1-f5e0908f0e12/stage_2_deduplicate/input_data.csv",
+  "checksum": "3675de7b9d398467d75f09a8aca489660e2fa54e417a42d45f36507c1b5c2889",
+  "metrics": {
+    "records_total": 3,
+    "records_retained": 3,
+    "records_removed": 0
+  },
+  "valid": true
+}

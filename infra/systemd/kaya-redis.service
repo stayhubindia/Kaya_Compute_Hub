@@ -1,0 +1,17 @@
+[Unit]
+Description=Kaya Bounded Redis Service (128M Memory Limit for 2GB RAM VM)
+After=network.target
+
+[Service]
+Type=simple
+User=durgesh
+ExecStart=/usr/bin/redis-server --port 6379 --maxmemory 128mb --maxmemory-policy volatile-lru --save 900 1
+Restart=always
+RestartSec=3s
+
+# Low-resource systemd limits (2GB RAM VM protection)
+MemoryMax=256M
+CPUQuota=50%
+
+[Install]
+WantedBy=multi-user.target

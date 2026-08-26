@@ -1,0 +1,25 @@
+{
+  "dataset_version": "dataset-v2.0",
+  "lifecycle_state": "READY",
+  "created_at": "2026-08-26T08:52:17.208849+00:00",
+  "seed": 42,
+  "counts": {
+    "total_unique_records": 10,
+    "train_records": 9,
+    "validation_records": 0,
+    "test_records": 1,
+    "raw_generated": 10,
+    "rejected": 0
+  },
+  "quality": {
+    "mean_quality_score": 1.0,
+    "total_accepted": 10
+  },
+  "files": {
+    "train": "splits/train.jsonl",
+    "validation": "splits/validation.jsonl",
+    "test": "splits/test.jsonl",
+    "raw_candidates": "raw/candidates.jsonl",
+    "processed_accepted": "processed/accepted.jsonl"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "training_run_id": "53932696-f526-44ec-ad28-169e3604f53e",
+  "epoch": 2,
+  "step": 20,
+  "metrics": {
+    "loss": 1.4062,
+    "val_loss": 1.4765,
+    "accuracy": 0.8
+  },
+  "checkpoint_data": {
+    "epoch": 2,
+    "weights_summary": "demo_weights_epoch_2"
+  }
+}
