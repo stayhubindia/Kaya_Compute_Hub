@@ -16,13 +16,20 @@ export default function ConnectionsSettingsPage() {
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Form State for Direct Token/Vault Entry
+  // Link & Verification Code Flow State
+  const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  const [oauthState, setOauthState] = useState<string | null>(null);
+  const [authCodeInput, setAuthCodeInput] = useState('');
+  const [accountEmailInput, setAccountEmailInput] = useState('stayhubindia@gmail.com');
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+
+  // Direct Entry Form Toggle State
   const [showAddForm, setShowAddForm] = useState(false);
   const [email, setEmail] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [refreshToken, setRefreshToken] = useState('');
-  const [rawJson, setRawJson] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const loadData = async () => {
@@ -36,7 +43,7 @@ export default function ConnectionsSettingsPage() {
       setError(null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load connected accounts.');
-    } finally {
+    } fontally {
       setIsLoading(false);
     }
   };
@@ -45,6 +52,55 @@ export default function ConnectionsSettingsPage() {
     loadData();
   }, []);
 
+  // 1. Server generates Google Verification Link
+  const handleGenerateAuthLink = async () => {
+    setIsGeneratingLink(true);
+    setError(null);
+    setActionMessage(null);
+    try {
+      const res = await integrationsClient.startGoogleOAuth();
+      setGeneratedUrl(res.authorization_url);
+      setOauthState(res.state);
+      setActionMessage('🔗 Google Authorization link generated! Click below to open in Google, then paste the returned authorization code.');
+    } catch (err: any) {
+      setError(err?.message || 'Failed to generate Google Authorization URL.');
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  // 2. User submits Google Code to complete verification
+  const handleVerifyAuthCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authCodeInput.trim()) {
+      setError('Please paste the Google Authorization Code first.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setError(null);
+    setActionMessage(null);
+
+    try {
+      const res = await integrationsClient.verifyGoogleAuthCode({
+        code: authCodeInput.trim(),
+        state: oauthState || undefined,
+        email: accountEmailInput.trim() || undefined,
+      });
+
+      setActionMessage(`🎉 Google Account [${res.email || accountEmailInput}] successfully verified and saved to Vault!`);
+      setAuthCodeInput('');
+      setGeneratedUrl(null);
+      setOauthState(null);
+      await loadData();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to verify Google Authorization Code.');
+    } finally {
+      setIsVerifyingCode(false);
+    }
+  };
+
+  // Direct Token Form Submit
   const handleDirectConnectSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) {
@@ -62,15 +118,13 @@ export default function ConnectionsSettingsPage() {
         display_name: displayName || email,
         access_token: accessToken,
         refresh_token: refreshToken,
-        raw_json: rawJson,
       });
 
-      setActionMessage(`🎉 Google Account [${email}] successfully registered in Vault!`);
+      setActionMessage(`🎉 Google Account [${email}] saved to Vault!`);
       setEmail('');
       setDisplayName('');
       setAccessToken('');
       setRefreshToken('');
-      setRawJson('');
       setShowAddForm(false);
       await loadData();
     } catch (err: any) {
@@ -82,7 +136,7 @@ export default function ConnectionsSettingsPage() {
 
   const handleVerify = async (id: string) => {
     try {
-      setActionMessage('Verifying token status with Google Drive API...');
+      setActionMessage('Verifying account token status...');
       const res = await integrationsClient.verifyAccount(id);
       setActionMessage(`Account status: ${res.status}`);
       await loadData();
@@ -103,13 +157,13 @@ export default function ConnectionsSettingsPage() {
   };
 
   const handleRevoke = async (id: string) => {
-    if (!window.confirm('Revoke access with Google? This will remove token credentials.')) return;
+    if (!window.confirm('Remove Google Account from Vault?')) return;
     try {
       await integrationsClient.revokeAccount(id);
-      setActionMessage('Account access revoked.');
+      setActionMessage('Account removed from Vault.');
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Failed to revoke account.');
+      setError(err?.message || 'Failed to remove account.');
     }
   };
 
@@ -125,47 +179,155 @@ export default function ConnectionsSettingsPage() {
           <div>
             <h1 style={{ fontSize: '24px', fontWeight: '700' }}>Google & Colab Account Vault</h1>
             <p style={{ color: '#94a3b8', fontSize: '14px', marginTop: '4px' }}>
-              Connect Google accounts directly for Drive file syncing and Colab GPU failover.
+              Connect and verify Google accounts for Drive dataset sync and Colab GPU workers.
             </p>
           </div>
 
-          <button
-            onClick={() => setShowAddForm(!showAddForm)}
-            style={{
-              background: '#0284c7',
-              color: '#fff',
-              padding: '10px 18px',
-              borderRadius: '8px',
-              fontWeight: '600',
-              border: 'none',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px'
-            }}
-          >
-            {showAddForm ? '✕ Close Form' : '🔑 Register Google Account Token'}
-          </button>
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <button
+              onClick={handleGenerateAuthLink}
+              disabled={isGeneratingLink}
+              style={{
+                background: '#0284c7',
+                color: '#fff',
+                padding: '10px 18px',
+                borderRadius: '8px',
+                fontWeight: '600',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              {isGeneratingLink ? 'Generating Link...' : '🔗 Generate Google Auth Link'}
+            </button>
+
+            <button
+              onClick={() => setShowAddForm(!showAddForm)}
+              style={{
+                background: '#334155',
+                color: '#fff',
+                padding: '10px 16px',
+                borderRadius: '8px',
+                fontWeight: '600',
+                border: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {showAddForm ? '✕ Close' : '⚙️ Direct Vault Token Input'}
+            </button>
+          </div>
         </div>
 
         {actionMessage && (
-          <div style={{ background: '#0369a122', border: '1px solid #0284c7', color: '#38bdf8', padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '14px' }}>
+          <div style={{ background: '#0369a122', border: '1px solid #0284c7', color: '#38bdf8', padding: '14px 18px', borderRadius: '10px', marginBottom: '20px', fontSize: '14px' }}>
             {actionMessage}
           </div>
         )}
 
         {error && <ErrorState message={error} />}
 
-        {/* Direct Account Entry Form */}
+        {/* 1. SERVER-GENERATED GOOGLE AUTH LINK & VERIFICATION CARD */}
+        {generatedUrl && (
+          <div style={{ background: '#0f172a', border: '2px solid #0284c7', borderRadius: '14px', padding: '24px', marginBottom: '28px', boxShadow: '0 10px 30px rgba(2,132,199,0.2)' }}>
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#38bdf8', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>🌐</span> Step 1: Open Google Authorization Link
+            </h2>
+            <p style={{ fontSize: '13px', color: '#cbd5e1', marginBottom: '16px' }}>
+              Click the generated button below to open Google in a new tab, sign in with your account (e.g., <strong>stayhubindia@gmail.com</strong>), approve permissions, and copy the Google Authorization Code.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '20px', background: '#1e293b', padding: '12px', borderRadius: '8px', border: '1px solid #334155' }}>
+              <a
+                href={generatedUrl}
+                target="_blank"
+                rel="noreferrer"
+                style={{
+                  background: '#0284c7',
+                  color: '#fff',
+                  padding: '10px 20px',
+                  borderRadius: '6px',
+                  fontWeight: '700',
+                  textDecoration: 'none',
+                  fontSize: '14px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                🔗 Open Google Authorization Page ↗
+              </a>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(generatedUrl);
+                  alert('Authorization URL copied to clipboard!');
+                }}
+                style={{ background: '#334155', color: '#cbd5e1', border: 'none', padding: '10px 14px', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+              >
+                📋 Copy Link
+              </button>
+            </div>
+
+            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#38bdf8', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span>✅</span> Step 2: Paste Code & Verify Account
+            </h2>
+
+            <form onSubmit={handleVerifyAuthCode} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '14px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Google Account Email</label>
+                  <input
+                    type="email"
+                    required
+                    value={accountEmailInput}
+                    onChange={(e) => setAccountEmailInput(e.target.value)}
+                    placeholder="stayhubindia@gmail.com"
+                    style={{ width: '100%', padding: '10px', background: '#090d16', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '12px', color: '#94a3b8', marginBottom: '4px' }}>Google Authorization Code *</label>
+                  <input
+                    type="text"
+                    required
+                    value={authCodeInput}
+                    onChange={(e) => setAuthCodeInput(e.target.value)}
+                    placeholder="Paste code from Google here (e.g., 4/1AY0e-g...)"
+                    style={{ width: '100%', padding: '10px', background: '#090d16', border: '1px solid #0284c7', borderRadius: '6px', color: '#86efac', fontFamily: 'monospace', fontWeight: '600' }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <button
+                  type="submit"
+                  disabled={isVerifyingCode}
+                  style={{
+                    background: '#16a34a',
+                    color: '#fff',
+                    padding: '12px 28px',
+                    borderRadius: '8px',
+                    fontWeight: '700',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    boxShadow: '0 4px 14px rgba(22,163,74,0.3)'
+                  }}
+                >
+                  {isVerifyingCode ? 'Verifying Code...' : '✅ Submit Code & Complete Verification'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Direct Token Form */}
         {showAddForm && (
           <div style={{ background: '#1e293b', border: '1px solid #38bdf8', borderRadius: '12px', padding: '24px', marginBottom: '28px' }}>
             <h2 style={{ fontSize: '18px', fontWeight: '600', marginBottom: '8px', color: '#38bdf8' }}>
-              🔐 Register Google / Colab Account into Vault
+              🔐 Direct Vault Token Entry
             </h2>
-            <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '20px' }}>
-              No browser OAuth popup required! Input your Google Account email and optional credentials to store in the stateless token vault.
-            </p>
-
             <form onSubmit={handleDirectConnectSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                 <div>
@@ -175,40 +337,29 @@ export default function ConnectionsSettingsPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. stayhubindia@gmail.com"
+                    placeholder="stayhubindia@gmail.com"
                     style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
                   />
                 </div>
                 <div>
-                  <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Account Label / Alias</label>
+                  <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Account Alias</label>
                   <input
                     type="text"
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g. Primary Drive Account"
+                    placeholder="Primary Storage"
                     style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff' }}
                   />
                 </div>
               </div>
 
               <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Access Token / Authorization Code (Optional)</label>
+                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Access Token / Auth Code (Optional)</label>
                 <input
                   type="text"
                   value={accessToken}
                   onChange={(e) => setAccessToken(e.target.value)}
-                  placeholder="e.g. ya29.a0... or 4/1AY0e..."
-                  style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff', fontFamily: 'monospace' }}
-                />
-              </div>
-
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', color: '#cbd5e1', marginBottom: '6px' }}>Refresh Token or JSON Token Object (Optional)</label>
-                <textarea
-                  rows={2}
-                  value={refreshToken}
-                  onChange={(e) => setRefreshToken(e.target.value)}
-                  placeholder="e.g. 1//0g..."
+                  placeholder="ya29... or auth code"
                   style={{ width: '100%', padding: '10px', background: '#0f172a', border: '1px solid #475569', borderRadius: '6px', color: '#fff', fontFamily: 'monospace' }}
                 />
               </div>
@@ -219,7 +370,7 @@ export default function ConnectionsSettingsPage() {
                   disabled={isSubmitting}
                   style={{ background: '#0284c7', color: '#fff', padding: '10px 24px', borderRadius: '6px', fontWeight: '600', border: 'none', cursor: 'pointer' }}
                 >
-                  {isSubmitting ? 'Saving to Vault...' : '💾 Save Account to Vault'}
+                  {isSubmitting ? 'Saving...' : '💾 Save to Vault'}
                 </button>
                 <button
                   type="button"
@@ -233,16 +384,11 @@ export default function ConnectionsSettingsPage() {
           </div>
         )}
 
-        {/* Anti-Quota Evasion & Setup Note */}
-        <div style={{ background: '#1e293b', border: '1px solid #334155', borderRadius: '10px', padding: '16px 20px', marginBottom: '24px', fontSize: '13px', color: '#cbd5e1' }}>
-          💡 <strong>Multi-Account Drive Setup:</strong> Share your primary Google Drive folder with secondary accounts and click <em>&quot;Add shortcut to Drive&quot;</em> in secondary accounts. Any connected account in this Vault will access your models and datasets automatically without losing progress!
-        </div>
-
         {/* Account Cards List */}
         {accounts.length === 0 ? (
           <EmptyState
-            title="No Accounts Registered in Vault"
-            description="Click 'Register Google Account Token' above to add stayhubindia@gmail.com or other accounts."
+            title="No Verified Google Accounts in Vault"
+            description="Click '🔗 Generate Google Auth Link' above to open Google verification, or add your account directly."
           />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -267,6 +413,7 @@ export default function ConnectionsSettingsPage() {
 
                   <p style={{ color: '#94a3b8', fontSize: '13px', margin: '4px 0' }}>
                     Vault Account ID: <strong style={{ color: '#e2e8f0' }}>{acc.id.slice(0, 8)}</strong> | Registered: {new Date(acc.connected_at).toLocaleString()}
+                    {acc.last_verified_at && ` | Verified: ${new Date(acc.last_verified_at).toLocaleTimeString()}`}
                   </p>
 
                   <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '10px' }}>

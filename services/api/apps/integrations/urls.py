@@ -5,6 +5,7 @@ urlpatterns = [
     # Google OAuth Endpoints
     path('google/start/', views.google_oauth_start, name='google-oauth-start'),
     path('google/callback/', views.google_oauth_callback, name='google-oauth-callback'),
+    path('google/verify-code/', views.google_oauth_verify_code, name='google-oauth-verify-code'),
     path('google/direct-connect/', views.google_account_direct_connect, name='google-account-direct-connect'),
     path('google/accounts/', views.google_accounts_list, name='google-accounts-list'),
     path('google/<uuid:pk>/verify/', views.google_account_verify, name='google-account-verify'),

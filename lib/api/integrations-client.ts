@@ -39,6 +39,10 @@ export const integrationsClient = {
     return api.post<ConnectedAccount>('/integrations/google/direct-connect/', data);
   },
 
+  verifyGoogleAuthCode: async (data: { code: string; state?: string; email?: string }): Promise<ConnectedAccount> => {
+    return api.post<ConnectedAccount>('/integrations/google/verify-code/', data);
+  },
+
   verifyAccount: async (accountId: string): Promise<{ status: string; last_verified_at?: string; message?: string }> => {
     return api.post<{ status: string; last_verified_at?: string; message?: string }>(`/integrations/google/${accountId}/verify/`);
   },
