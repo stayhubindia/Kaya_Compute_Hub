@@ -7,7 +7,7 @@ import { connectEventStream } from '../api/eventsClient';
 export function useJobEvents(jobId?: string) {
   const [events, setEvents] = useState<SystemEvent[]>([]);
   const [isConnected, setIsConnected] = useState<boolean>(false);
-  const lastEventIdRef = useRef<string | undefined>();
+  const lastEventIdRef = useRef<string | undefined>(undefined);
 
   const handleEvent = useCallback((evt: SystemEvent) => {
     if (!evt) return;
