@@ -50,25 +50,113 @@ from services.integrations.google.drive_client import GoogleDriveClient
 from services.integrations.colab_enterprise.client import ColabEnterpriseClient
 from services.integrations.colab_enterprise.executions import ExternalRunStatus
 from services.integrations.google.errors import GoogleOAuthError, TokenRevokedError, GoogleDriveError
+from services.worker.executors.colab_executor import _activate_account, _cli
 
 # --- Colab Account & Vault Endpoints ---
+
+
+def _oauth_start_response(request):
+    redirect_uri = os.environ.get(
+        "GOOGLE_OAUTH_REDIRECT_URI",
+        request.build_absolute_uri('/api/v1/integrations/google/callback/')
+    )
+    verifier, challenge = generate_pkce_pair()
+    state_value = generate_state()
+    oauth_state = OAuthState.objects.create(
+        state=state_value,
+        user=request.user,
+        code_verifier=verifier,
+        redirect_uri=redirect_uri,
+        scopes=[],
+        expires_at=timezone.now() + timedelta(minutes=10),
+    )
+    authorization_url = get_authorization_url(
+        state=oauth_state.state,
+        code_challenge=challenge,
+        redirect_uri=redirect_uri,
+    )
+    return {
+        "auth_url": authorization_url,
+        "authorization_url": authorization_url,
+        "state": oauth_state.state,
+        "expires_at": oauth_state.expires_at.isoformat(),
+    }
+
+
+def _save_google_account(user, tokens, request=None):
+    access_token = tokens.get('access_token', '')
+    if not access_token:
+        raise GoogleOAuthError("Google did not return an access token.")
+    userinfo = fetch_google_userinfo(access_token)
+    provider_account_id = userinfo.get('sub')
+    if not provider_account_id:
+        raise GoogleOAuthError("Google user profile did not contain an account id.")
+
+    account, _ = ConnectedAccount.objects.get_or_create(
+        user=user,
+        provider='google',
+        provider_account_id=provider_account_id,
+    )
+    account.email = userinfo.get('email', '')
+    account.display_name = userinfo.get('name') or account.email
+    account.set_access_token(access_token)
+    account.set_refresh_token(tokens.get('refresh_token', ''))
+    account.token_expiry = timezone.now() + timedelta(seconds=tokens.get('expires_in', 3600))
+    account.scopes = tokens.get('scope', '').split()
+    account.status = AccountStatusChoices.ACTIVE
+    account.last_verified_at = timezone.now()
+    account.disconnected_at = None
+    account.save()
+    log_audit_event(
+        action="auth.google_account_connected",
+        resource_type="connected_account",
+        resource_id=str(account.id),
+        actor=user,
+        metadata={"email": account.email},
+        request=request,
+    )
+    return account
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def google_oauth_start(request):
+    try:
+        return Response(_oauth_start_response(request))
+    except GoogleOAuthError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def google_oauth_callback(request):
+    state_value = request.query_params.get('state', '')
+    code = request.query_params.get('code', '')
+    oauth_state = OAuthState.objects.filter(
+        state=state_value,
+        expires_at__gt=timezone.now(),
+    ).first()
+    if not oauth_state:
+        return Response({"error": {"message": "Invalid or expired OAuth state."}}, status=status.HTTP_400_BAD_REQUEST)
+    if not code:
+        return Response({"error": {"message": "Google authorization code is missing."}}, status=status.HTTP_400_BAD_REQUEST)
+    try:
+        tokens = exchange_code_for_tokens(code, oauth_state.code_verifier, oauth_state.redirect_uri)
+        account = _save_google_account(oauth_state.user, tokens, request=request)
+        oauth_state.delete()
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
+        return redirect(f"{frontend_url}/dashboard/settings/connections?google=connected&account={account.id}")
+    except GoogleOAuthError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def google_colab_auth_link(request):
-    """Generate official Google Colab authorization URL for copy-paste verification."""
-    params = {
-        'client_id': '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com',
-        'redirect_uri': 'https://sdk.cloud.google.com/applicationdefaultauthcode.html',
-        'response_type': 'code',
-        'scope': 'openid https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/colaboratory',
-        'access_type': 'offline',
-        'prompt': 'consent',
-        'token_usage': 'remote'
-    }
-    req = requests.Request('GET', 'https://accounts.google.com/o/oauth2/v2/auth', params=params)
-    prepared = req.prepare()
-    return Response({"auth_url": prepared.url})
+    """Generate a short-lived PKCE Google authorization URL."""
+    try:
+        return Response(_oauth_start_response(request))
+    except GoogleOAuthError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @api_view(['POST'])
@@ -79,96 +167,39 @@ def google_colab_verify_code(request):
     saves the account to ConnectedAccount DB and creates local Vault JSON file.
     """
     code = request.data.get('code', '').strip()
-    email_override = request.data.get('email', '').strip() or 'stayhubindia@gmail.com'
+    state_value = request.data.get('state', '').strip()
 
     if not code:
         return Response({"error": {"message": "Authorization code is required."}}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Attempt official token exchange with Google
-    payload = {
-        'client_id': '764086051850-6qr4p6gpi6hn506pt8ejuq83di341hur.apps.googleusercontent.com',
-        'client_secret': 'd-FL95Q19q7MQmFpd7hHD0Ty',
-        'code': code,
-        'grant_type': 'authorization_code',
-        'redirect_uri': 'https://sdk.cloud.google.com/applicationdefaultauthcode.html',
-    }
-
-    access_token = code
-    refresh_token = ""
-    token_expiry = timezone.now() + timedelta(days=365)
-    user_email = email_override
-
-    try:
-        resp = requests.post('https://oauth2.googleapis.com/token', data=payload, timeout=10)
-        if resp.status_code == 200:
-            tokens = resp.json()
-            access_token = tokens.get('access_token', code)
-            refresh_token = tokens.get('refresh_token', '')
-            expires_in = tokens.get('expires_in', 3600)
-            token_expiry = timezone.now() + timedelta(seconds=expires_in)
-
-            # Try to fetch real user email from userinfo
-            try:
-                userinfo_resp = requests.get(
-                    'https://www.googleapis.com/oauth2/v3/userinfo',
-                    headers={'Authorization': f'Bearer {access_token}'},
-                    timeout=5
-                )
-                if userinfo_resp.status_code == 200:
-                    user_email = userinfo_resp.json().get('email', user_email)
-            except Exception:
-                pass
-    except Exception:
-        pass
-
-    # Save to ConnectedAccount DB
-    account, created = ConnectedAccount.objects.get_or_create(
+    oauth_state = OAuthState.objects.filter(
         user=request.user,
-        email=user_email,
-        defaults={
-            'provider': 'google',
-            'provider_account_id': f"colab-{uuid.uuid4().hex[:8]}",
-            'display_name': user_email,
-        }
-    )
-
-    account.display_name = user_email
-    account.set_access_token(access_token)
-    if refresh_token:
-        account.set_refresh_token(refresh_token)
-    account.token_expiry = token_expiry
-    account.status = AccountStatusChoices.ACTIVE
-    account.last_verified_at = timezone.now()
-    account.scopes = ["openid", "drive.readonly", "colaboratory"]
-    account.save()
-
-    # Mirror to Vault JSON file (~/.config/colab-cli/saved_accounts/<email>.json)
+        state=state_value,
+        expires_at__gt=timezone.now(),
+    ).first() if state_value else OAuthState.objects.filter(
+        user=request.user,
+        expires_at__gt=timezone.now(),
+    ).order_by('-created_at').first()
+    if not oauth_state:
+        return Response({"error": {"message": "Authorization session expired. Generate a new link."}}, status=status.HTTP_400_BAD_REQUEST)
     try:
-        vault_dir = Path.home() / ".config/colab-cli/saved_accounts"
-        vault_dir.mkdir(parents=True, exist_ok=True)
-        safe_filename = user_email.replace("@", "_at_")
-        vault_file = vault_dir / f"{safe_filename}.json"
-        vault_file.write_text(json.dumps({
-            "email": user_email,
-            "access_token": access_token,
-            "refresh_token": refresh_token,
-            "auth_code": code,
-            "created_at": timezone.now().isoformat()
-        }, indent=2))
-    except Exception:
-        pass
+        tokens = exchange_code_for_tokens(code, oauth_state.code_verifier, oauth_state.redirect_uri)
+        account = _save_google_account(request.user, tokens, request=request)
+        oauth_state.delete()
+        return Response(ConnectedAccountSerializer(account).data, status=status.HTTP_200_OK)
+    except GoogleOAuthError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
 
-    log_audit_event(
-        action="auth.colab_account_code_verified",
-        resource_type="connected_account",
-        resource_id=str(account.id),
-        actor=request.user,
-        metadata={"email": user_email},
-        request=request
-    )
 
-    serializer = ConnectedAccountSerializer(account)
-    return Response(serializer.data, status=status.HTTP_200_OK)
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def google_account_reconnect(request, pk):
+    if not ConnectedAccount.objects.filter(pk=pk, user=request.user).exists():
+        return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
+    try:
+        return Response(_oauth_start_response(request))
+    except GoogleOAuthError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @api_view(['GET'])
@@ -625,24 +656,12 @@ def colab_session_create(request):
         except ConnectedAccount.DoesNotExist:
             return Response({"error": {"message": "Selected Vault account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
-    # Sync selected Vault account credentials to active ~/.config/colab-cli/token.json
+    # Activate the selected account using google-auth's authorized-user format.
     if account:
-        safe_filename = account.email.replace("@", "_at_")
-        vault_file = Path.home() / f".config/colab-cli/saved_accounts/{safe_filename}.json"
-        token_file = Path.home() / ".config/colab-cli/token.json"
-        token_file.parent.mkdir(parents=True, exist_ok=True)
-
-        if vault_file.exists():
-            shutil.copy2(vault_file, token_file)
-        else:
-            access_token = account.get_access_token()
-            refresh_token = account.get_refresh_token()
-            token_data = {
-                "email": account.email,
-                "access_token": access_token,
-                "refresh_token": refresh_token,
-            }
-            token_file.write_text(json.dumps(token_data, indent=2))
+        try:
+            _activate_account(account)
+        except Exception as exc:
+            return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
 
     # Clear stale sessions cache
     sessions_cache = Path.home() / ".config/colab-cli/sessions.json"
@@ -655,9 +674,9 @@ def colab_session_create(request):
     colab_bin = _get_colab_bin()
 
     # Stop orphan local assignment first
-    subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    subprocess.run(_cli(colab_bin, "stop", "-s", session_name), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
-    cmd = [colab_bin, "new", "-s", session_name]
+    cmd = _cli(colab_bin, "new", "-s", session_name)
     if gpu_variant.upper() in ["T4", "L4", "G4", "H100", "A100"]:
         cmd.extend(["--gpu", gpu_variant.upper()])
     elif gpu_variant.upper() in ["TPU", "V5E1", "V6E1"]:
@@ -678,7 +697,7 @@ def colab_session_create(request):
         ping_script.write_text("print('COLAB_VM_READY')\n", encoding="utf-8")
 
         ping_proc = subprocess.run(
-            [colab_bin, "exec", "-s", session_name, "-f", str(ping_script)],
+            _cli(colab_bin, "exec", "-s", session_name, "-f", str(ping_script)),
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=25
         )
         kernel_ready = "COLAB_VM_READY" in ping_proc.stdout or proc.returncode == 0
@@ -713,9 +732,16 @@ def colab_session_create(request):
 def colab_sessions_list(request):
     """List active Google Colab VM sessions."""
     colab_bin = _get_colab_bin()
+    if not (Path.home() / ".config/colab-cli/token.json").exists():
+        return Response({
+            "output_raw": "",
+            "sessions": [],
+            "active_count": 0,
+            "action_required": "Authorize a Google account before listing Colab sessions.",
+        })
 
     try:
-        proc = subprocess.run([colab_bin, "sessions"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
+        proc = subprocess.run(_cli(colab_bin, "sessions"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
         raw_lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
 
         return Response({
@@ -738,7 +764,7 @@ def colab_session_stop(request):
     colab_bin = _get_colab_bin()
 
     try:
-        proc = subprocess.run([colab_bin, "stop", "-s", session_name], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
+        proc = subprocess.run(_cli(colab_bin, "stop", "-s", session_name), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=20)
         return Response({
             "status": "stopped",
             "session_name": session_name,

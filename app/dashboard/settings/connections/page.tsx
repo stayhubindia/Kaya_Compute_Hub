@@ -20,6 +20,7 @@ export default function ConnectionsSettingsPage() {
   // Colab Auth Panel State
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authLink, setAuthLink] = useState<string | null>(null);
+  const [authState, setAuthState] = useState<string>('');
   const [authCode, setAuthCode] = useState('');
   const [authEmail, setAuthEmail] = useState('stayhubindia@gmail.com');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -56,6 +57,7 @@ export default function ConnectionsSettingsPage() {
         setIsFetchingLink(true);
         const res = await integrationsClient.getColabAuthLink();
         setAuthLink(res.auth_url);
+        setAuthState(res.state);
       } catch (err: any) {
         setError('Failed to generate Colab authentication link.');
       } finally {
@@ -79,7 +81,7 @@ export default function ConnectionsSettingsPage() {
     try {
       const res = await integrationsClient.verifyColabCode({
         code: authCode.trim(),
-        email: authEmail.trim() || undefined,
+        state: authState,
       });
 
       setActionMessage(`🎉 Colab Account [${res.email || authEmail}] verified & saved to Vault!`);

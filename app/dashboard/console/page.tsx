@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import DashboardNavbar from '@/components/DashboardNavbar';
 import { User, authClient } from '@/lib/api/authClient';
 import { api } from '@/lib/api/client';
+import { ConnectedAccount, integrationsClient } from '@/lib/api/integrations-client';
 
 const TEMPLATE_SCRIPTS: Record<string, { name: string; code: string }> = {
   arxiv_test: {
@@ -134,6 +135,10 @@ export default function ConsolePage() {
   const [scriptName, setScriptName] = useState('ArXiv Test Script');
   const [codeContent, setCodeContent] = useState(TEMPLATE_SCRIPTS.arxiv_test.code);
   const [executionMode, setExecutionMode] = useState<'instant' | 'job'>('instant');
+  const [accounts, setAccounts] = useState<ConnectedAccount[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState('');
+  const [sessionName, setSessionName] = useState('kaya-colab-worker');
+  const [accelerator, setAccelerator] = useState('T4');
   const [targetDir, setTargetDir] = useState('/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv');
   const [isExecutingCode, setIsExecutingCode] = useState(false);
   const [codeOutput, setCodeOutput] = useState<{ status?: string; stdout?: string; stderr?: string; execution_time?: string; job_id?: string; message?: string } | null>(null);
@@ -177,6 +182,10 @@ export default function ConsolePage() {
       try {
         const u = await authClient.getCurrentUser();
         setUser(u);
+        const connected = await integrationsClient.listConnectedAccounts();
+        const active = connected.filter((account) => account.status === 'active');
+        setAccounts(active);
+        setSelectedAccountId(active[0]?.id || '');
       } catch {
         // Handled by API middleware
       } finally {
@@ -275,6 +284,10 @@ export default function ConsolePage() {
         mode: executionMode,
         script_name: scriptName,
         target_dir: targetDir
+        ,execution_target: executionMode === 'job' ? 'colab' : 'vm'
+        ,selected_google_account_id: selectedAccountId || undefined
+        ,session_name: sessionName
+        ,accelerator
       });
 
       setCodeOutput(data);
@@ -744,7 +757,7 @@ export default function ConsolePage() {
           </div>
 
           {/* Form Options: Mode & Target Directory */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px', marginBottom: '16px' }}>
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
                 Execution Mode:
@@ -767,6 +780,54 @@ export default function ConsolePage() {
                 <option value="job">🚀 Background Compute Job (Orchestrated Job)</option>
               </select>
             </div>
+
+            {executionMode === 'job' && (
+              <>
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
+                    Authorized Google Account:
+                  </label>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    style={{ width: '100%', background: '#020617', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '10px 12px', fontSize: '13px' }}
+                  >
+                    <option value="">-- Connect an account first --</option>
+                    {accounts.map((account) => (
+                      <option key={account.id} value={account.id}>{account.email || account.display_name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
+                    Persistent Session:
+                  </label>
+                  <input
+                    value={sessionName}
+                    onChange={(e) => setSessionName(e.target.value)}
+                    style={{ width: '100%', background: '#020617', color: '#38bdf8', border: '1px solid #334155', borderRadius: '6px', padding: '10px 12px', fontSize: '13px' }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
+                    Colab Accelerator:
+                  </label>
+                  <select
+                    value={accelerator}
+                    onChange={(e) => setAccelerator(e.target.value)}
+                    style={{ width: '100%', background: '#020617', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '10px 12px', fontSize: '13px' }}
+                  >
+                    <option value="T4">NVIDIA T4</option>
+                    <option value="L4">NVIDIA L4</option>
+                    <option value="A100">NVIDIA A100</option>
+                    <option value="TPU">Google TPU</option>
+                    <option value="CPU">CPU</option>
+                  </select>
+                </div>
+              </>
+            )}
 
             <div>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>
@@ -835,7 +896,7 @@ export default function ConsolePage() {
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
             <button
               onClick={handleExecuteScript}
-              disabled={isExecutingCode}
+              disabled={isExecutingCode || (executionMode === 'job' && !selectedAccountId)}
               style={{
                 background: executionMode === 'instant' ? '#0284c7' : '#7c3aed',
                 color: '#fff',
@@ -845,14 +906,14 @@ export default function ConsolePage() {
                 fontSize: '15px',
                 fontWeight: '700',
                 cursor: isExecutingCode ? 'not-allowed' : 'pointer',
-                opacity: isExecutingCode ? 0.7 : 1
+                opacity: isExecutingCode || (executionMode === 'job' && !selectedAccountId) ? 0.7 : 1
               }}
             >
               {isExecutingCode
                 ? 'Running Execution...'
                 : executionMode === 'instant'
                   ? '⚡ Run Test Script Now'
-                  : '🚀 Submit Background Job'}
+                  : '🚀 Submit Persistent Colab Job'}
             </button>
           </div>
 

@@ -29,32 +29,25 @@ class LoginView(APIView):
         input_email = str(serializer.validated_data['email']).strip()
         password = str(serializer.validated_data['password']).strip()
 
-        # Find user by exact/case-insensitive match, or fallback to active admin user
+        # Panel login is strictly separate from connected Google identities.
         user = User.objects.filter(email__iexact=input_email, is_active=True).first()
-        if not user:
-            user = User.objects.filter(is_active=True).first()
 
-        if user:
-            if user.check_password(password) or password in ("Admin12345!", "DUrg7080@", "adminpassword"):
-                if not user.check_password(password):
-                    user.set_password(password)
-                    user.save(update_fields=['password'])
+        if user and user.check_password(password):
+            login(request, user)
+            request.session.cycle_key()
+            request.session.set_expiry(86400 * 30)
 
-                login(request, user)
-                request.session.cycle_key()
-                request.session.set_expiry(86400 * 30)
+            log_audit_event(
+                action="auth.login_success",
+                resource_type="user",
+                resource_id=str(user.id),
+                actor=user,
+                request=request
+            )
 
-                log_audit_event(
-                    action="auth.login_success",
-                    resource_type="user",
-                    resource_id=str(user.id),
-                    actor=user,
-                    request=request
-                )
-
-                return Response({
-                    "user": UserSerializer(user).data
-                }, status=status.HTTP_200_OK)
+            return Response({
+                "user": UserSerializer(user).data
+            }, status=status.HTTP_200_OK)
 
         log_audit_event(
             action="auth.login_failure",

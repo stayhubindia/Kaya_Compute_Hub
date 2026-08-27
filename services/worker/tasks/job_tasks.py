@@ -5,10 +5,17 @@ from apps.jobs.models import Job, JobStatusChoices
 from apps.jobs.services import transition_job_status, update_job_progress, claim_job_atomically
 from apps.audit.services import log_audit_event
 from services.worker.executors.demo_executor import run_approved_executor
+from services.worker.executors.colab_executor import run_colab_job
 
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, max_retries=3, default_retry_delay=5)
+@shared_task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=5,
+    time_limit=21600,
+    soft_time_limit=21300,
+)
 def execute_job(self, job_id: str, worker_name: str = "celery-worker-01"):
     """
     Celery task entrypoint for async job execution.
@@ -38,8 +45,16 @@ def execute_job(self, job_id: str, worker_name: str = "celery-worker-01"):
                 raise InterruptedError("Job execution cancelled by user request.")
             update_job_progress(current_job, pct, stage, msg)
 
-        # 4. Run approved demo executor
-        output_result = run_approved_executor(job.job_type, job.payload or {}, progress_callback)
+        # 4. Execute on the requested target. Colab jobs remain controlled by
+        # this VM/Celery worker even after the user's browser disconnects.
+        if (job.payload or {}).get("execution_target") == "colab":
+            output_result = run_colab_job(job, progress_callback)
+        else:
+            output_result = run_approved_executor(job.job_type, job.payload or {}, progress_callback)
+
+        job.refresh_from_db()
+        job.payload = {**(job.payload or {}), "execution_result": output_result}
+        job.save(update_fields=["payload", "updated_at"])
 
         # 5. Transition to succeeded
         transition_job_status(job, JobStatusChoices.SUCCEEDED)

@@ -66,3 +66,5 @@ kaya-compute-hub/
 - **HttpOnly Session Cookies**: Authentication uses HttpOnly, SameSite=Lax session cookies. Zero exposure of tokens or passwords in browser `localStorage`.
 - **Argon2 Password Hashing**: Passwords are hashed using Argon2 (`argon2-cffi`).
 - **External Integration Isolation**: Connected Google Accounts for Google Drive and Colab Enterprise remain external integration credentials and cannot log into the admin panel.
+
+For the UI-driven persistent Google Colab workflow, see [VM-Controlled Google Colab Jobs](docs/COLAB_ORCHESTRATION.md).

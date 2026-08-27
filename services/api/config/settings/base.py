@@ -72,7 +72,7 @@ MIDDLEWARE = [
 ]
 
 # CORS & CSRF Trusted Origins Configuration
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [o.strip() for o in os.environ.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in os.environ.get('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://127.0.0.1:3000,https://kaya.stayhubindia.com,http://kaya.stayhubindia.com').split(',') if o.strip()]

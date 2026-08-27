@@ -10,6 +10,7 @@ from apps.jobs.services import transition_job_status
 from apps.accounts.permissions import IsAuthenticatedAdmin
 from apps.audit.services import log_audit_event
 from services.worker.tasks.job_tasks import execute_job
+from apps.logs.views import sanitize_log_message
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class JobViewSet(viewsets.ModelViewSet):
         )
         return Response({"message": "Job deleted successfully", "id": job_id}, status=status.HTTP_200_OK)
 
-    def _create_and_dispatch_job(self, request, job_type: str, default_name: str, payload_data: dict) -> Response:
+    def _create_and_dispatch_job(self, request, job_type: str, default_name: str, payload_data: dict, selected_account=None) -> Response:
         idempotency_key = request.data.get('idempotency_key')
         if idempotency_key:
             existing_job = Job.objects.filter(created_by=request.user, idempotency_key=idempotency_key).first()
@@ -67,6 +68,7 @@ class JobViewSet(viewsets.ModelViewSet):
             priority=priority,
             payload=payload_data,
             idempotency_key=idempotency_key,
+            selected_google_account=selected_account,
         )
 
         log_audit_event(
@@ -107,7 +109,8 @@ class JobViewSet(viewsets.ModelViewSet):
             request,
             job_type=job_type,
             default_name=serializer.validated_data.get('name', 'Job'),
-            payload_data=serializer.validated_data.get('payload', {})
+            payload_data=serializer.validated_data.get('payload', {}),
+            selected_account=serializer.validated_data.get('selected_google_account'),
         )
 
     @action(detail=False, methods=['post'], permission_classes=[permissions.IsAuthenticated])
@@ -161,6 +164,18 @@ class JobViewSet(viewsets.ModelViewSet):
         job = self.get_object()
         logs_data = []
 
+        from apps.logs.models import JobLog
+        persisted_logs = JobLog.objects.filter(job=job).order_by('timestamp')[:1000]
+        if persisted_logs:
+            logs_data = [{
+                "id": str(log.id),
+                "timestamp": log.timestamp.isoformat(),
+                "level": log.level,
+                "module": log.module,
+                "message": sanitize_log_message(log.message),
+            } for log in persisted_logs]
+            return Response({"job_id": str(job.id), "count": len(logs_data), "logs": logs_data}, status=status.HTTP_200_OK)
+
         logs_data.append({
             "id": f"{job.id}-created",
             "timestamp": job.created_at.isoformat() if job.created_at else "",
@@ -208,6 +223,25 @@ class JobViewSet(viewsets.ModelViewSet):
                     "message": f"Configured output directory: '{output_dir}'"
                 })
 
+            execution_result = job.payload.get("execution_result", {})
+            if execution_result:
+                if execution_result.get("stdout"):
+                    logs_data.append({
+                        "id": f"{job.id}-colab-stdout",
+                        "timestamp": job.updated_at.isoformat() if job.updated_at else "",
+                        "level": "info",
+                        "module": "colab_runtime",
+                        "message": sanitize_log_message(execution_result["stdout"][-20000:]),
+                    })
+                if execution_result.get("stderr"):
+                    logs_data.append({
+                        "id": f"{job.id}-colab-stderr",
+                        "timestamp": job.updated_at.isoformat() if job.updated_at else "",
+                        "level": "warning",
+                        "module": "colab_runtime",
+                        "message": sanitize_log_message(execution_result["stderr"][-20000:]),
+                    })
+
         if job.error_message:
             logs_data.append({
                 "id": f"{job.id}-error",
@@ -234,7 +268,7 @@ class JobViewSet(viewsets.ModelViewSet):
                 "message": "Job was cancelled by user request."
             })
 
-        return Response({"logs": logs_data}, status=status.HTTP_200_OK)
+        return Response({"job_id": str(job.id), "count": len(logs_data), "logs": logs_data}, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
     def cancel(self, request, pk=None):

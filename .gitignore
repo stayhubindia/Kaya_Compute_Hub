@@ -33,6 +33,14 @@ storage/logs/*
 storage/tmp/*
 !storage/tmp/.gitkeep
 
+# Django API runtime storage (tests and workers create these dynamically)
+services/api/storage/datasets/*
+services/api/storage/checkpoints/*
+services/api/storage/models/*
+!services/api/storage/datasets/.gitkeep
+!services/api/storage/checkpoints/.gitkeep
+!services/api/storage/models/.gitkeep
+
 # Models & Weights
 *.bin
 *.pth

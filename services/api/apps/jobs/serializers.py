@@ -10,6 +10,7 @@ class JobSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'created_by', 'created_by_email', 'name', 'description',
             'job_type', 'status', 'priority', 'payload', 'idempotency_key',
+            'selected_google_account',
             'progress_percentage', 'current_stage', 'progress_message',
             'assigned_worker', 'assigned_worker_name', 'retry_count', 'max_retries',
             'error_code', 'error_message', 'started_at', 'finished_at',
@@ -32,6 +33,27 @@ class JobSerializer(serializers.ModelSerializer):
         return value
 
 class JobCreateSerializer(serializers.ModelSerializer):
+    selected_google_account_id = serializers.UUIDField(required=False, allow_null=True, write_only=True)
+
     class Meta:
         model = Job
-        fields = ['name', 'description', 'job_type', 'priority', 'payload', 'idempotency_key', 'max_retries']
+        fields = ['name', 'description', 'job_type', 'priority', 'payload', 'idempotency_key', 'max_retries', 'selected_google_account_id']
+
+    def validate(self, attrs):
+        request = self.context['request']
+        payload = attrs.get('payload') or {}
+        account_id = attrs.get('selected_google_account_id')
+        if payload.get('execution_target') == 'colab':
+            if not account_id:
+                raise serializers.ValidationError({'selected_google_account_id': 'Select an active Google account for Colab execution.'})
+            if not payload.get('code', '').strip():
+                raise serializers.ValidationError({'payload': 'Python code is required for a Colab job.'})
+        if account_id:
+            from apps.integrations.models import ConnectedAccount, AccountStatusChoices
+            account = ConnectedAccount.objects.filter(id=account_id, user=request.user).first()
+            if not account:
+                raise serializers.ValidationError({'selected_google_account_id': 'Selected Google account was not found.'})
+            if account.status != AccountStatusChoices.ACTIVE:
+                raise serializers.ValidationError({'selected_google_account_id': f"Selected Google account is {account.status}."})
+            attrs['selected_google_account'] = account
+        return attrs

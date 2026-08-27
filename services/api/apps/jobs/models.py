@@ -14,6 +14,9 @@ class JobTypeChoices(models.TextChoices):
     EVALUATION = 'evaluate_model', 'Evaluate Model'
     SYNC_DRIVE = 'sync_to_drive', 'Sync to Drive'
     CUSTOM_SCRIPT = 'custom_script', 'Custom Script'
+    # Backward-compatible public API values retained for existing clients.
+    NOTEBOOK = 'notebook', 'Notebook'
+    TRAINING = 'training', 'Training'
 
 class JobStatusChoices(models.TextChoices):
     DRAFT = 'draft', 'Draft'

@@ -1,0 +1,129 @@
+"""Execution adapter that lets a persistent VM dispatch a job to Colab CLI."""
+
+import fcntl
+import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
+from pathlib import Path
+from typing import Callable
+
+
+class ColabExecutionError(RuntimeError):
+    pass
+
+
+def _colab_binary() -> str:
+    configured = os.environ.get("COLAB_CLI_BIN", "").strip()
+    if configured:
+        return configured
+    candidate = Path(os.sys.executable).parent / "colab"
+    return str(candidate) if candidate.exists() else (shutil.which("colab") or "colab")
+
+
+def _safe_session_name(value: str) -> str:
+    value = re.sub(r"[^a-zA-Z0-9_-]+", "-", value.strip()).strip("-")
+    return (value or "kaya-colab-worker")[:64]
+
+
+def _activate_account(account) -> None:
+    if account is None:
+        raise ColabExecutionError("A connected Google account is required for Colab execution.")
+    if account.status != "active":
+        raise ColabExecutionError(f"Selected Google account is '{account.status}', not active.")
+
+    token_dir = Path.home() / ".config/colab-cli"
+    token_dir.mkdir(parents=True, exist_ok=True)
+    token_file = token_dir / "token.json"
+    payload = {
+        "token": account.get_access_token(),
+        "refresh_token": account.get_refresh_token(),
+        "token_uri": "https://oauth2.googleapis.com/token",
+        "client_id": os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""),
+        "client_secret": os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""),
+        "scopes": account.scopes or [],
+    }
+    if account.token_expiry:
+        payload["expiry"] = account.token_expiry.isoformat().replace("+00:00", "Z")
+    if not payload["token"] and not payload["refresh_token"]:
+        raise ColabExecutionError("Selected Google account has no usable OAuth token.")
+    if not payload["client_id"] or not payload["client_secret"]:
+        raise ColabExecutionError("VM Google OAuth client credentials are not configured.")
+
+    temp_file = token_dir / f"token.{os.getpid()}.tmp"
+    temp_file.write_text(json.dumps(payload), encoding="utf-8")
+    temp_file.chmod(0o600)
+    temp_file.replace(token_file)
+
+
+def _cli(colab_bin: str, *args: str) -> list[str]:
+    return [colab_bin, "--auth=oauth2", *args]
+
+
+def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> dict:
+    """Create/reuse a Colab session and execute the job's Python code from the VM."""
+    payload = job.payload or {}
+    code = payload.get("code", "").strip()
+    if not code:
+        raise ColabExecutionError("Colab job payload must contain Python code.")
+
+    session_name = _safe_session_name(payload.get("session_name", f"kaya-{str(job.id)[:8]}"))
+    accelerator = str(payload.get("accelerator", "T4")).upper()
+    timeout_seconds = min(max(int(payload.get("timeout_seconds", 1800)), 30), 21600)
+    colab_bin = _colab_binary()
+    lock_path = Path(tempfile.gettempdir()) / "kaya-colab-cli.lock"
+
+    update_progress_cb(5, "colab_auth", "Activating selected Google account on the VM")
+    with lock_path.open("w") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        _activate_account(job.selected_google_account)
+
+        update_progress_cb(15, "colab_session", f"Checking Colab session '{session_name}'")
+        sessions = subprocess.run(
+            _cli(colab_bin, "sessions"), capture_output=True, text=True, timeout=20
+        )
+        if session_name not in sessions.stdout:
+            create_cmd = _cli(colab_bin, "new", "-s", session_name)
+            if accelerator in {"T4", "L4", "A100", "H100"}:
+                create_cmd.extend(["--gpu", accelerator])
+            elif accelerator in {"TPU", "V5E1", "V6E1"}:
+                create_cmd.extend(["--tpu", "v5e1" if accelerator == "TPU" else accelerator.lower()])
+            created = subprocess.run(create_cmd, capture_output=True, text=True, timeout=120)
+            if created.returncode != 0:
+                message = (created.stderr or created.stdout).strip()
+                raise ColabExecutionError(f"Colab session allocation failed: {message}")
+
+        update_progress_cb(30, "colab_running", "VM dispatched the Python task to Colab")
+        script_path = None
+        try:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script:
+                script.write(code)
+                script_path = script.name
+            result = subprocess.run(
+                _cli(colab_bin, "exec", "-s", session_name, "-f", script_path, "--timeout", str(timeout_seconds)),
+                capture_output=True,
+                text=True,
+                timeout=timeout_seconds,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise ColabExecutionError(
+                f"Colab task exceeded its {timeout_seconds}-second VM timeout; resume from the latest Drive checkpoint."
+            ) from exc
+        finally:
+            if script_path:
+                Path(script_path).unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        raise ColabExecutionError((result.stderr or result.stdout or "Colab execution failed").strip())
+
+    update_progress_cb(100, "completed", "Colab task completed; output returned to the VM")
+    return {
+        "execution_target": "colab",
+        "session_name": session_name,
+        "accelerator": accelerator,
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+    }

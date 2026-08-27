@@ -4,7 +4,7 @@ export interface Job {
   id: string;
   name: string;
   description: string;
-  job_type: 'download' | 'extraction' | 'preprocessing' | 'notebook' | 'training' | 'evaluation';
+  job_type: 'download' | 'extraction' | 'preprocessing' | 'ingest_documents' | 'generate_candidates' | 'run_quality_audit' | 'freeze_dataset' | 'train_qlora' | 'evaluate_model' | 'sync_to_drive' | 'custom_script';
   status: 'draft' | 'queued' | 'leased' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'retrying';
   priority: number;
   progress_percentage: number;
@@ -18,6 +18,8 @@ export interface Job {
   created_by: string;
   created_at: string;
   updated_at: string;
+  payload?: Record<string, any>;
+  selected_google_account?: string | null;
 }
 
 export interface PaginatedList<T> {

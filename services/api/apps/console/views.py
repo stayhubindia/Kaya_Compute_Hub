@@ -8,24 +8,17 @@ import logging
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
-from django.views.decorators.csrf import csrf_exempt
-from django.utils.decorators import method_decorator
 
 from apps.jobs.models import Job, JobStatusChoices
 from services.worker.tasks.job_tasks import execute_job
 
 from rest_framework.authentication import SessionAuthentication
 
-class CsrfExemptSessionAuthentication(SessionAuthentication):
-    def enforce_csrf(self, request):
-        return  # Disable CSRF check for console executions
-
 logger = logging.getLogger(__name__)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class TerminalCommandView(APIView):
-    authentication_classes = (CsrfExemptSessionAuthentication,)
+    authentication_classes = (SessionAuthentication,)
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -81,9 +74,8 @@ class TerminalCommandView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-@method_decorator(csrf_exempt, name='dispatch')
 class CodeExecuteView(APIView):
-    authentication_classes = (CsrfExemptSessionAuthentication,)
+    authentication_classes = (SessionAuthentication,)
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
@@ -91,11 +83,23 @@ class CodeExecuteView(APIView):
         mode = request.data.get('mode', 'instant')  # 'instant' (Test Script) or 'job' (Background Job)
         script_name = request.data.get('script_name', 'Custom Test Script')
         target_dir = request.data.get('target_dir', '/content/drive/MyDrive/Colab Notebooks/Datasets/Arxiv')
+        execution_target = request.data.get('execution_target', 'colab' if mode == 'job' else 'vm')
+        selected_account_id = request.data.get('selected_google_account_id')
+        session_name = request.data.get('session_name', 'kaya-colab-worker')
+        accelerator = request.data.get('accelerator', 'T4')
 
         if not code:
             return Response({"error": "Python code string is required."}, status=status.HTTP_400_BAD_REQUEST)
 
         if mode == 'job':
+            from apps.integrations.models import ConnectedAccount, AccountStatusChoices
+            account = ConnectedAccount.objects.filter(
+                id=selected_account_id,
+                user=request.user,
+                status=AccountStatusChoices.ACTIVE,
+            ).first()
+            if execution_target == 'colab' and not account:
+                return Response({"error": "Select an active Google account for the Colab job."}, status=status.HTTP_400_BAD_REQUEST)
             # Create a tracked background compute Job
             job = Job.objects.create(
                 name=f"Script: {script_name}",
@@ -106,7 +110,11 @@ class CodeExecuteView(APIView):
                     "code": code,
                     "target_dir": target_dir,
                     "script_name": script_name
+                    ,"execution_target": execution_target
+                    ,"session_name": session_name
+                    ,"accelerator": accelerator
                 },
+                selected_google_account=account,
                 status=JobStatusChoices.QUEUED,
                 progress_percentage=0,
                 current_stage="queued"
