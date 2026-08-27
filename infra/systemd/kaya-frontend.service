@@ -9,7 +9,7 @@ WorkingDirectory=/home/Project/Kaya_Compute_Hub
 Environment="NODE_ENV=production"
 Environment="PORT=3000"
 Environment="HOSTNAME=127.0.0.1"
-ExecStart=/usr/bin/npm run start
+ExecStart=/usr/bin/npm run start -- --hostname 127.0.0.1
 Restart=always
 RestartSec=5s
 

@@ -98,7 +98,7 @@ jobs:
             npm run build
 
             # Restart services
-            sudo systemctl restart kaya-redis kaya-api kaya-worker kaya-frontend
+            sudo systemctl restart redis-server kaya-api kaya-worker kaya-frontend
             sleep 5
             curl --fail --silent http://127.0.0.1:8000/api/v1/health/
             echo "==== Deployment Completed Successfully ===="
