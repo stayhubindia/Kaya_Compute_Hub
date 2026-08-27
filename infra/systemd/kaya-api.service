@@ -1,6 +1,7 @@
 [Unit]
 Description=Kaya Compute Hub Django API (Low-Resource VM)
-After=network.target kaya-redis.service
+After=network.target redis-server.service
+Requires=redis-server.service
 
 [Service]
 Type=simple
@@ -9,7 +10,7 @@ WorkingDirectory=/home/Project/Kaya_Compute_Hub/services/api
 EnvironmentFile=-/home/Project/Kaya_Compute_Hub/.env
 EnvironmentFile=-/home/Project/Kaya_Compute_Hub/services/api/.env
 Environment="PATH=/home/Project/Kaya_Compute_Hub/.venv/bin:/usr/bin"
-Environment="DJANGO_SETTINGS_MODULE=config.settings.base"
+Environment="DJANGO_SETTINGS_MODULE=config.settings.production"
 ExecStart=/home/Project/Kaya_Compute_Hub/.venv/bin/gunicorn config.wsgi:application --bind 127.0.0.1:8000 --workers 1 --threads 2 --timeout 120
 Restart=always
 RestartSec=5s
