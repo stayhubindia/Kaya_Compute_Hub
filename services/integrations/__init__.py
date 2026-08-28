@@ -1,4 +1,4 @@
 """
 Kaya Compute Hub Integration Subsystem.
-Handles external service connectors (Google OAuth 2.0, Google Drive API, Google Cloud Storage, Colab Enterprise).
+Handles external service connectors (direct Google Drive API, Google Cloud Storage, and Colab CLI).
 """

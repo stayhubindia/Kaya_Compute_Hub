@@ -169,26 +169,10 @@ def smart_account_manager(session_name: str = "t4-prod", gpu: str = "T4", auto_t
     else:
         print("\n" + "=" * 80)
         print("🚨 ALL GOOGLE ACCOUNTS IN VAULT ARE RATE-LIMITED / QUOTA EXHAUSTED")
-        print("👉 GENERATING GOOGLE OAUTH AUTHENTICATION LINK FOR NEW ACCOUNT LOGIN")
+        print("👉 No automatic account login is performed by this manager.")
         print("=" * 80)
-        print("\nInstructions:")
-        print("1. Open the Google Authorization URL printed below in your browser.")
-        print("2. Sign in with any new/fresh Google Account.")
-        print("3. Copy the authorization code from Google and paste it into the prompt below.")
-        print("4. The new account token will be permanently saved to your Vault for future runs.\n")
-        
-        clear_active_colab_auth()
-        
-        # Launch interactive CLI login for new account
-        cmd = [colab_bin, "new", "-s", session_name, "--gpu", gpu]
-        proc = subprocess.run(cmd)
-        
-        if proc.returncode == 0 and TOKEN_FILE.exists():
-            new_vault = save_active_token_to_vault()
-            print(f"\n🎉 SUCCESS! New Google Account authenticated & saved to Vault: {new_vault.name if new_vault else 'Saved'}")
-        else:
-            print("\n❌ OAuth authentication incomplete or failed.")
-            return 1
+        print("Import that account's official Colab CLI token.json through Settings → Connections, then retry.\n")
+        return 1
 
     # 2. Launch Training if requested
     if auto_train:

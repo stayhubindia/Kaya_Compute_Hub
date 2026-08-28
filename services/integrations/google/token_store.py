@@ -13,11 +13,16 @@ def _get_fernet() -> Fernet:
         b64_key = base64.urlsafe_b64encode(hashed)
         return Fernet(b64_key)
     
-    # Fallback to Django SECRET_KEY if available or dynamically generated key
+    # Fallback to Django's stable SECRET_KEY for development/test contexts.
+    # Never generate a per-call key: ciphertext must remain decryptable after
+    # the process restarts.
     secret = os.environ.get("DJANGO_SECRET_KEY") or os.environ.get("SECRET_KEY")
     if not secret:
-        import secrets
-        secret = secrets.token_urlsafe(64)
+        try:
+            from django.conf import settings
+            secret = settings.SECRET_KEY
+        except Exception:
+            secret = "kaya-compute-hub-development-token-key"
     hashed = hashlib.sha256(secret.encode("utf-8")).digest()
     b64_key = base64.urlsafe_b64encode(hashed)
     return Fernet(b64_key)

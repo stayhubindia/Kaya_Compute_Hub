@@ -1,4 +1,3 @@
-import os
 from typing import List
 
 # Scope definitions
@@ -20,10 +19,7 @@ DEFAULT_SCOPES = [
 ]
 
 def get_configured_scopes() -> List[str]:
-    raw = os.environ.get("GOOGLE_OAUTH_SCOPES")
-    if not raw:
-        return DEFAULT_SCOPES
-    return [s.strip() for s in raw.split(",") if s.strip()]
+    return list(DEFAULT_SCOPES)
 
 def validate_scopes(requested_scopes: List[str]) -> bool:
     """Ensure requested scopes are in the permitted allowlist."""

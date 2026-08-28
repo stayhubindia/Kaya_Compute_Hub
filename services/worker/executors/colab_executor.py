@@ -61,8 +61,8 @@ def _activate_account(account) -> None:
 
 
 def _cli(colab_bin: str, *args: str) -> list[str]:
-    # The official Colab CLI reads the active token.json directly. No app-level
-    # OAuth client or browser callback is used by the VM.
+    # The official Colab CLI reads the active token.json directly. No browser
+    # callback or app registration is used by the VM.
     return [colab_bin, *args]
 
 

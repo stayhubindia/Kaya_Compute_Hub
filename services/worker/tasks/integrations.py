@@ -12,7 +12,7 @@ from services.integrations.colab_enterprise.executions import ExternalRunStatus,
 
 @shared_task(name="integrations.verify_connected_accounts", bind=True)
 def verify_connected_accounts(self):
-    """Verify imported Drive credentials without refreshing through an OAuth app."""
+    """Verify imported Drive credentials without an application callback."""
     active_accounts = ConnectedAccount.objects.filter(status=AccountStatusChoices.ACTIVE)
     verified = 0
     for account in active_accounts:

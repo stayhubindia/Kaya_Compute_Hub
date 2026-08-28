@@ -60,18 +60,12 @@ def google_account_verify(request, pk):
         return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
     try:
-        refresh_token = account.get_refresh_token()
         access_token = account.get_access_token()
 
-        # Check if local vault file exists
-        safe_filename = (account.email or "").replace("@", "_at_")
-        vault_file = Path.home() / f".config/colab-cli/saved_accounts/{safe_filename}.json"
-
-        if access_token or refresh_token or vault_file.exists():
-            if access_token:
-                # A real Drive API request verifies that this imported token
-                # belongs to a usable Drive account.
-                GoogleDriveClient(access_token).get_about()
+        if access_token:
+            # A real Drive API request verifies that this imported token
+            # belongs to a usable Drive account.
+            GoogleDriveClient(access_token).get_about()
             account.status = AccountStatusChoices.ACTIVE
             account.last_verified_at = timezone.now()
             account.save()
@@ -87,7 +81,7 @@ def google_account_verify(request, pk):
 
         account.status = AccountStatusChoices.EXPIRED
         account.save()
-        return Response({"status": "expired", "message": "No valid token or Vault file available."})
+        return Response({"status": "expired", "message": "No usable Drive access token is available. Re-import the account's current Colab CLI token.json."})
     except Exception as e:
         account.status = AccountStatusChoices.ERROR
         account.save()
@@ -105,6 +99,7 @@ def google_account_disconnect(request, pk):
 
     account.encrypted_access_token = ''
     account.encrypted_refresh_token = ''
+    account.encrypted_credential_json = ''
     account.status = AccountStatusChoices.DISCONNECTED
     account.disconnected_at = timezone.now()
     account.save()
@@ -153,7 +148,7 @@ def google_account_revoke(request, pk):
 @permission_classes([permissions.IsAuthenticated])
 def google_account_direct_connect(request):
     """
-    Direct token/credential vault entry for Google Drive & Colab accounts without web OAuth popup redirect.
+    Direct token/credential vault entry for Google Drive & Colab accounts.
     Saves to ConnectedAccount model and syncs to ~/.config/colab-cli/saved_accounts/<email>.json.
     """
     email = request.data.get('email', '').strip().lower()
@@ -163,7 +158,7 @@ def google_account_direct_connect(request):
     raw_json = request.data.get('raw_json', '')
 
     # Import the token.json produced by the account's official Colab CLI.
-    # This is a direct credential import; no client id, callback or OAuth app
+    # This is a direct credential import; no client id, callback or app
     # registration is involved.
     credential_payload = {}
     if isinstance(raw_json, dict):

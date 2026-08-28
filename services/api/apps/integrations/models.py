@@ -22,7 +22,7 @@ class ConnectedAccount(models.Model):
     encrypted_access_token = models.TextField(blank=True, default='')
     encrypted_refresh_token = models.TextField(blank=True, default='')
     # Complete Colab CLI token payload, encrypted so direct-import credentials
-    # (including provider metadata) survive account activation without OAuth.
+    # (including provider metadata) survive account activation.
     encrypted_credential_json = models.TextField(blank=True, default='')
     token_expiry = models.DateTimeField(null=True, blank=True)
     scopes = models.JSONField(default=list)

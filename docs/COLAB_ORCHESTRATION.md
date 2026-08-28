@@ -1,19 +1,14 @@
 # VM-Controlled Google Colab Jobs
 
-Kaya keeps the job record, retry policy, logs, and Colab CLI process on the VM. The browser is only used to authorize an account and submit or monitor jobs; closing the browser does not stop a running Celery task.
+Kaya keeps the job record, retry policy, logs, and Colab CLI process on the VM. The browser submits or monitors jobs; closing the browser does not stop a running Celery task. Google account credentials are imported directly from the official Colab CLI token file; Kaya does not run a browser callback or OAuth client.
 
 ## One-time VM setup
 
-1. Create a Google OAuth client and register this redirect URI:
-
-   `https://YOUR_DOMAIN/api/v1/integrations/google/callback/`
+1. On each Google account, sign in once with the official Colab CLI and copy its `~/.config/colab-cli/token.json` file contents.
 
 2. Configure the VM environment:
 
    ```env
-   GOOGLE_OAUTH_CLIENT_ID=...
-   GOOGLE_OAUTH_CLIENT_SECRET=...
-   GOOGLE_OAUTH_REDIRECT_URI=https://YOUR_DOMAIN/api/v1/integrations/google/callback/
    GOOGLE_TOKEN_ENCRYPTION_KEY=...
    FRONTEND_URL=https://YOUR_DOMAIN
    COLAB_CLI_BIN=/absolute/path/to/colab
@@ -25,8 +20,8 @@ Kaya keeps the job record, retry policy, logs, and Colab CLI process on the VM. 
 
 ## UI workflow
 
-1. Open **Settings → Connections** and choose **Authenticate Colab Account**.
-2. Complete Google consent. The callback stores encrypted OAuth tokens on the VM and returns to the UI.
+1. Open **Settings → Connections** and choose **Connect account**.
+2. Enter the account email and paste its Colab CLI `token.json`. Kaya encrypts it, writes a 0600 vault copy, and verifies Drive with `about.get`.
 3. Open **Console → Script Sandbox & Jobs**.
 4. Select **Background Compute Job**, an authorized account, persistent session name, and accelerator.
 5. Submit Python code. The VM queues it, creates or reuses the Colab session, executes the code, retries transient failures, and stores stdout/stderr in the job detail page.
