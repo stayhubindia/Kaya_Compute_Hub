@@ -247,7 +247,19 @@ export default function ConsolePage() {
       const cwdMarker = /(?:^|\n)KAYA_CWD=([^\n\r]+)/;
       const cwdMatch = typeof data.stdout === 'string' ? data.stdout.match(cwdMarker) : null;
       if (cwdMatch) setColabCwd(cwdMatch[1].trim());
-      const visibleStdout = typeof data.stdout === 'string' ? data.stdout.replace(cwdMarker, '').trim() : '';
+      const visibleStdout = typeof data.stdout === 'string'
+        ? data.stdout
+            .replace(cwdMarker, '')
+            .split('\n')
+            .filter((line: string) => !(
+              line.startsWith('[colab] A new version of Colab CLI is available:') ||
+              line.startsWith("[colab] Run 'colab update' to update.") ||
+              line.startsWith('[colab] To silence this check, set') ||
+              line.startsWith('[colab] Using unique session')
+            ))
+            .join('\n')
+            .trim()
+        : '';
       if (visibleStdout) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: visibleStdout }]);
       }
