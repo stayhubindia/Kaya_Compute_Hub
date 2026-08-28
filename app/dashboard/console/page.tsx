@@ -106,6 +106,7 @@ export default function ConsolePage() {
 
   // Terminal State
   const [terminalTarget, setTerminalTarget] = useState<'colab' | 'vm'>('colab');
+  const [colabCwd, setColabCwd] = useState('/content');
   const [commandInput, setCommandInput] = useState('');
   const [terminalLogs, setTerminalLogs] = useState<Array<{ timestamp: string; type: 'cmd' | 'stdout' | 'stderr' | 'system'; text: string }>>([
     { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Kaya Compute Colab Interactive Terminal v2.0 connected.\n[TARGET: 🌐 Google Colab Cloud Container (root@colab-cloud:#)]\nType any bash command (whoami, pwd, ls -la, nvidia-smi) to execute directly inside your Colab container.' }
@@ -230,8 +231,12 @@ export default function ConsolePage() {
     try {
       let payload: any;
       if (isCloudTarget) {
-        // Execute bash command inside Google Colab cloud container via colab exec
-        const pyWrapper = `import subprocess\nprint(subprocess.getoutput('''${rawCmd}'''))\n`;
+        // Every `colab exec` call is a separate process on the VM. Keep the
+        // shell directory as explicit client state and apply it inside the
+        // live kernel, so `cd drive` behaves like a real terminal command.
+        const encodedCommand = btoa(unescape(encodeURIComponent(rawCmd)));
+        const encodedCwd = btoa(unescape(encodeURIComponent(colabCwd)));
+        const pyWrapper = `import base64, os, subprocess, sys\ncmd = base64.b64decode('${encodedCommand}').decode()\ncwd = base64.b64decode('${encodedCwd}').decode()\nif cmd.strip() == 'cd' or cmd.strip().startswith('cd '):\n    destination = cmd.strip()[2:].strip() or '/content'\n    destination = os.path.expanduser(destination)\n    if not os.path.isabs(destination):\n        destination = os.path.normpath(os.path.join(cwd, destination))\n    if not os.path.isdir(destination):\n        print('cd: no such directory: ' + destination, file=sys.stderr)\n    else:\n        cwd = destination\nelse:\n    result = subprocess.run(cmd, shell=True, cwd=cwd, text=True, capture_output=True)\n    if result.stdout: print(result.stdout, end='')\n    if result.stderr: print(result.stderr, end='', file=sys.stderr)\nprint('KAYA_CWD=' + cwd)\n`;
         payload = { command: 'colab exec', stdin_input: pyWrapper };
       } else {
         payload = { command: rawCmd };
@@ -239,13 +244,19 @@ export default function ConsolePage() {
       }
 
       const data: any = await api.post('/console/terminal/', payload);
-      if (data.stdout) {
-        setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: data.stdout }]);
+      const cwdMarker = /(?:^|\n)KAYA_CWD=([^\n\r]+)/;
+      const cwdMatch = typeof data.stdout === 'string' ? data.stdout.match(cwdMarker) : null;
+      if (cwdMatch) setColabCwd(cwdMatch[1].trim());
+      const visibleStdout = typeof data.stdout === 'string' ? data.stdout.replace(cwdMarker, '').trim() : '';
+      if (visibleStdout) {
+        setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: visibleStdout }]);
       }
       if (data.stderr) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: data.stderr }]);
       }
-      if (!data.stdout && !data.stderr) {
+      if (cwdMatch && !visibleStdout && !data.stderr) {
+        setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: `Directory changed to ${cwdMatch[1].trim()}` }]);
+      } else if (!data.stdout && !data.stderr) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: `Command completed with exit code ${data.returncode} (${data.execution_time_ms}ms)` }]);
       }
     } catch (err: any) {
@@ -685,7 +696,7 @@ export default function ConsolePage() {
               display: 'flex',
               alignItems: 'center'
             }}>
-              {terminalTarget === 'colab' ? 'root@colab-cloud:#' : 'durgesh@kaya-vm:$'}
+              {terminalTarget === 'colab' ? `root@colab-cloud:${colabCwd}#` : 'durgesh@kaya-vm:$'}
             </span>
             <input
               type="text"
