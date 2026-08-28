@@ -21,6 +21,8 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
   const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
   const [callbackUrl, setCallbackUrl] = useState<string>('');
   const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
+  const [driveMountId, setDriveMountId] = useState<string | null>(null);
+  const [driveMountUrl, setDriveMountUrl] = useState<string | null>(null);
 
   const fetchAccountsAndSessions = async () => {
     try {
@@ -126,6 +128,36 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
       await fetchAccountsAndSessions();
     } catch (err: any) {
       setErrorMessage(err?.message || 'Could not complete Colab authorization.');
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
+
+  const handleStartDriveMount = async (targetSession: string) => {
+    setIsAuthorizing(true);
+    setErrorMessage(null);
+    try {
+      const result = await integrationsClient.startColabDriveMount(targetSession);
+      setDriveMountId(result.mount_id);
+      setDriveMountUrl(result.authorization_url);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Could not start Drive mount.');
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
+
+  const handleCompleteDriveMount = async () => {
+    if (!driveMountId) return;
+    setIsAuthorizing(true);
+    try {
+      const result = await integrationsClient.completeColabDriveMount(driveMountId);
+      setDriveMountId(null);
+      setDriveMountUrl(null);
+      setSuccessMessage(result.message);
+      window.setTimeout(() => { fetchAccountsAndSessions(); }, 4000);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Could not complete Drive mount.');
     } finally {
       setIsAuthorizing(false);
     }
@@ -322,6 +354,13 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
                 </span>
 
                 <button
+                  onClick={() => handleStartDriveMount(sess.name)}
+                  disabled={isAuthorizing || sess.drive_mounted === true}
+                  style={{ background: '#166534', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', marginRight: '8px' }}
+                >
+                  Mount Drive
+                </button>
+                <button
                   onClick={() => {
                     handleStopSession(sess.name);
                   }}
@@ -338,6 +377,14 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
       {activeSessions.length === 0 && (
         <div style={{ marginTop: '24px', borderTop: '1px solid #334155', paddingTop: '16px', color: '#94a3b8', fontSize: '13px' }}>
           No active Colab sessions. Google Drive is not mounted because there is no live Colab kernel to mount it in.
+        </div>
+      )}
+
+      {driveMountUrl && (
+        <div style={{ marginTop: '16px', background: '#14532d22', border: '1px solid #16a34a', color: '#dcfce7', padding: '12px 16px', borderRadius: '10px', fontSize: '13px' }}>
+          <a href={driveMountUrl} target="_blank" rel="noreferrer" style={{ color: '#86efac', fontWeight: '700', wordBreak: 'break-all' }}>1. Open Google Drive authorization link</a>
+          <div style={{ margin: '8px 0' }}>2. Grant Drive access, return here, then confirm.</div>
+          <button onClick={handleCompleteDriveMount} disabled={isAuthorizing} style={{ background: '#16a34a', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '6px', cursor: 'pointer', fontWeight: '600' }}>I granted Drive access — complete mount</button>
         </div>
       )}
     </div>

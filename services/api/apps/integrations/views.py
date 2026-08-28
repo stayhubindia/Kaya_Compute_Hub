@@ -6,8 +6,8 @@ import shutil
 import subprocess
 import hashlib
 import re
-import os
 import select
+import shlex
 import tempfile
 import time
 from urllib.parse import parse_qs, urlparse, urlunparse
@@ -55,11 +55,13 @@ _COLAB_SESSION_LINE = re.compile(
     r"Hardware:\s+(?P<accelerator>[^|]+?)\s+\|\s+Variant:\s+(?P<variant>[^|]+?)(?:\s+\|\s+Status:\s+(?P<status>.+))?$"
 )
 _COLAB_AUTH_URL = re.compile(r"https://accounts\.google\.com/o/oauth2/auth\?\S+")
+_COLAB_INTERACTIVE_URL = re.compile(r"https?://[^\s'\"]+")
 _COLAB_AUTH_DIR = Path(tempfile.gettempdir()) / "kaya-colab-auth"
 # Keep the process and its output pipe alive in the API worker while Google
 # redirects the browser callback back to the VM. State needed by a different
 # worker is also persisted in `_COLAB_AUTH_DIR`.
 _COLAB_AUTH_PROCESSES: dict[str, subprocess.Popen] = {}
+_COLAB_DRIVE_MOUNT_PROCESSES: dict[str, subprocess.Popen] = {}
 
 
 def _parse_colab_sessions(output: str) -> list[dict]:
@@ -288,6 +290,69 @@ def colab_authorization_complete(request):
         request=request,
     )
     return Response({"status": "active", "account": ConnectedAccountSerializer(account).data})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_drive_mount_start(request):
+    """Start the CLI's interactive Drive mount and return its consent link."""
+    session_name = str(request.data.get("session_name", "")).strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,64}", session_name):
+        return Response({"error": {"message": "A valid Colab session name is required."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    command = " ".join(shlex.quote(part) for part in _cli(_get_colab_bin(), "drivemount", "-s", session_name, "/content/drive"))
+    # Upstream `drivemount` waits on /dev/tty after it emits a Drive consent
+    # link. `script` supplies that terminal so a browser user can approve it.
+    process = subprocess.Popen(
+        ["script", "-qfec", command, "/dev/null"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, start_new_session=True,
+    )
+    consent_url = ""
+    deadline = time.monotonic() + 25
+    while time.monotonic() < deadline and process.poll() is None:
+        readable, _, _ = select.select([process.stdout], [], [], 0.5)
+        if not readable:
+            continue
+        match = _COLAB_INTERACTIVE_URL.search(process.stdout.readline())
+        if match:
+            consent_url = match.group(0).rstrip(".,)")
+            break
+    if not consent_url:
+        process.terminate()
+        return Response({"error": {"message": "Colab did not request Drive authorization. Confirm the session is active and try again."}}, status=status.HTTP_502_BAD_GATEWAY)
+
+    mount_id = uuid.uuid4().hex
+    _write_colab_auth_state(mount_id, {
+        "kind": "drive_mount", "user_id": str(request.user.id), "session_name": session_name,
+        "expires_at": time.time() + 600,
+    })
+    _COLAB_DRIVE_MOUNT_PROCESSES[mount_id] = process
+    return Response({"mount_id": mount_id, "authorization_url": consent_url, "expires_in_seconds": 600}, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_drive_mount_complete(request):
+    mount_id = str(request.data.get("mount_id", ""))
+    try:
+        state = json.loads(_colab_auth_state_path(mount_id).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        state = {}
+    process = _COLAB_DRIVE_MOUNT_PROCESSES.get(mount_id)
+    if (
+        state.get("kind") != "drive_mount" or state.get("user_id") != str(request.user.id)
+        or state.get("expires_at", 0) < time.time() or not process or process.poll() is not None or not process.stdin
+    ):
+        return Response({"error": {"message": "Drive mount request expired or stopped. Start it again."}}, status=status.HTTP_409_CONFLICT)
+    try:
+        process.stdin.write("\n")
+        process.stdin.flush()
+    except OSError as exc:
+        return Response({"error": {"message": str(exc)}}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    _colab_auth_state_path(mount_id).unlink(missing_ok=True)
+    _COLAB_DRIVE_MOUNT_PROCESSES.pop(mount_id, None)
+    return Response({"status": "resuming", "session_name": state["session_name"], "message": "Drive consent sent to Colab. Refresh session status in a few seconds."})
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])

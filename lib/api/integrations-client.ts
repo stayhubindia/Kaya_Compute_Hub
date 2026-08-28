@@ -95,6 +95,14 @@ export const integrationsClient = {
     });
   },
 
+  startColabDriveMount: async (sessionName: string): Promise<{ mount_id: string; authorization_url: string }> => {
+    return api.post('/integrations/colab/drive-mount/start/', { session_name: sessionName });
+  },
+
+  completeColabDriveMount: async (mountId: string): Promise<{ status: string; message: string }> => {
+    return api.post('/integrations/colab/drive-mount/complete/', { mount_id: mountId });
+  },
+
   listColabSessions: async (): Promise<{ output_raw: string; sessions: ColabSession[]; active_count: number; cli_error?: string }> => {
     return api.get('/integrations/colab/sessions/?include_drive_status=1');
   },
