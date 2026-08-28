@@ -22,6 +22,8 @@ urlpatterns = [
     path('colab/runs/<uuid:pk>/cancel/', views.colab_run_cancel, name='colab-run-cancel'),
 
     # Colab Native CLI Session Allocator Endpoints
+    path('colab/authorize/start/', views.colab_authorization_start, name='colab-authorization-start'),
+    path('colab/authorize/complete/', views.colab_authorization_complete, name='colab-authorization-complete'),
     path('colab/sessions/create/', views.colab_session_create, name='colab-session-create'),
     path('colab/sessions/', views.colab_sessions_list, name='colab-sessions-list'),
     path('colab/sessions/stop/', views.colab_session_stop, name='colab-session-stop'),

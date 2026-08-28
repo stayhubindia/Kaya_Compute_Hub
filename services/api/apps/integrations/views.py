@@ -6,6 +6,13 @@ import shutil
 import subprocess
 import hashlib
 import re
+import os
+import select
+import tempfile
+import time
+from urllib.parse import parse_qs, urlparse, urlunparse
+
+import requests
 from pathlib import Path
 from datetime import timedelta
 
@@ -47,6 +54,12 @@ _COLAB_SESSION_LINE = re.compile(
     r"^\[(?P<name>[^\]]+)\]\s+(?P<endpoint>\S+)\s+\|\s+"
     r"Hardware:\s+(?P<accelerator>[^|]+?)\s+\|\s+Variant:\s+(?P<variant>[^|]+?)(?:\s+\|\s+Status:\s+(?P<status>.+))?$"
 )
+_COLAB_AUTH_URL = re.compile(r"https://accounts\.google\.com/o/oauth2/auth\?\S+")
+_COLAB_AUTH_DIR = Path(tempfile.gettempdir()) / "kaya-colab-auth"
+# Keep the process and its output pipe alive in the API worker while Google
+# redirects the browser callback back to the VM. State needed by a different
+# worker is also persisted in `_COLAB_AUTH_DIR`.
+_COLAB_AUTH_PROCESSES: dict[str, subprocess.Popen] = {}
 
 
 def _parse_colab_sessions(output: str) -> list[dict]:
@@ -84,6 +97,172 @@ def _probe_drive_mount(colab_bin: str, session_name: str) -> bool | None:
     finally:
         probe.unlink(missing_ok=True)
     return None
+
+
+def _colab_auth_state_path(auth_id: str) -> Path:
+    return _COLAB_AUTH_DIR / f"{auth_id}.json"
+
+
+def _write_colab_auth_state(auth_id: str, payload: dict) -> None:
+    _COLAB_AUTH_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    path = _colab_auth_state_path(auth_id)
+    temp_path = path.with_suffix(".tmp")
+    temp_path.write_text(json.dumps(payload), encoding="utf-8")
+    temp_path.chmod(0o600)
+    temp_path.replace(path)
+
+
+def _read_colab_auth_state(auth_id: str, user_id: str) -> dict | None:
+    if not re.fullmatch(r"[a-f0-9]{32}", auth_id):
+        return None
+    path = _colab_auth_state_path(auth_id)
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    if payload.get("user_id") != user_id or payload.get("expires_at", 0) < time.time():
+        return None
+    return payload
+
+
+def _parse_complete_colab_token(token_file: Path) -> dict:
+    try:
+        payload = json.loads(token_file.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise ValueError("Colab authorization did not produce a readable token.") from exc
+    missing = [field for field in ("client_id", "client_secret", "refresh_token") if not payload.get(field)]
+    if missing:
+        raise ValueError(f"Colab authorization is incomplete (missing: {', '.join(missing)}).")
+    return payload
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_authorization_start(request):
+    """Start official Colab CLI login on the VM and return its browser URL."""
+    _COLAB_AUTH_DIR.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for path in _COLAB_AUTH_DIR.glob("*.json"):
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            if existing.get("expires_at", 0) > time.time() and existing.get("user_id") == str(request.user.id):
+                return Response({
+                    "error": {"message": "A Colab authorization is already waiting for this account. Complete or wait for it to expire."}
+                }, status=status.HTTP_409_CONFLICT)
+        except (OSError, ValueError):
+            continue
+
+    colab_bin = _get_colab_bin()
+    env = os.environ.copy()
+    # `echo` prevents a headless VM from trying to open a browser while still
+    # making the official CLI print its Google authorization URL.
+    env.update({"BROWSER": "echo", "PYTHONUNBUFFERED": "1"})
+    process = subprocess.Popen(
+        _cli(colab_bin, "sessions"),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env,
+        start_new_session=True,
+    )
+    auth_url = ""
+    deadline = time.monotonic() + 12
+    while time.monotonic() < deadline and process.poll() is None:
+        readable, _, _ = select.select([process.stdout], [], [], 0.5)
+        if not readable:
+            continue
+        line = process.stdout.readline()
+        match = _COLAB_AUTH_URL.search(line)
+        if match:
+            auth_url = match.group(0)
+            break
+
+    if not auth_url:
+        process.terminate()
+        return Response({
+            "error": {"message": "The Colab CLI did not provide an authorization URL. Try again shortly."}
+        }, status=status.HTTP_502_BAD_GATEWAY)
+
+    auth_id = uuid.uuid4().hex
+    _write_colab_auth_state(auth_id, {
+        "user_id": str(request.user.id),
+        "pid": process.pid,
+        "authorization_url": auth_url,
+        "oauth_state": (parse_qs(urlparse(auth_url).query).get("state") or [""])[0],
+        "expires_at": time.time() + 600,
+    })
+    _COLAB_AUTH_PROCESSES[auth_id] = process
+    return Response({
+        "authorization_id": auth_id,
+        "authorization_url": auth_url,
+        "expires_in_seconds": 600,
+        "instruction": "Open the URL, approve access, then copy the complete localhost callback URL from the browser address bar back into Kaya.",
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_authorization_complete(request):
+    """Forward the browser's localhost callback to the waiting VM Colab CLI."""
+    auth_id = str(request.data.get("authorization_id", ""))
+    callback_url = str(request.data.get("callback_url", "")).strip()
+    auth_state = _read_colab_auth_state(auth_id, str(request.user.id))
+    if not auth_state:
+        return Response({"error": {"message": "Authorization request was not found or expired. Start again."}}, status=status.HTTP_404_NOT_FOUND)
+
+    parsed = urlparse(callback_url)
+    callback_state = (parse_qs(parsed.query).get("state") or [""])[0]
+    if parsed.scheme != "http" or parsed.hostname not in {"localhost", "127.0.0.1"} or parsed.port != 8200:
+        return Response({"error": {"message": "Paste the complete localhost:8200 callback URL shown after Google approval."}}, status=status.HTTP_400_BAD_REQUEST)
+    if not callback_state or callback_state != auth_state.get("oauth_state"):
+        return Response({"error": {"message": "This callback does not belong to the pending authorization request."}}, status=status.HTTP_400_BAD_REQUEST)
+    if not parse_qs(parsed.query).get("code"):
+        return Response({"error": {"message": "Google did not return an authorization code. Approve access and paste the final callback URL."}}, status=status.HTTP_400_BAD_REQUEST)
+
+    vm_callback = urlunparse(("http", "127.0.0.1:8200", parsed.path or "/", "", parsed.query, ""))
+    try:
+        requests.get(vm_callback, timeout=15)
+        time.sleep(1)
+        token_payload = _parse_complete_colab_token(Path.home() / ".config/colab-cli/token.json")
+        userinfo = requests.get(
+            "https://openidconnect.googleapis.com/v1/userinfo",
+            headers={"Authorization": f"Bearer {token_payload.get('token', '')}"},
+            timeout=15,
+        )
+        userinfo.raise_for_status()
+        email = str(userinfo.json().get("email", "")).strip().lower()
+        if not email:
+            raise ValueError("Google did not return an email address for this Colab account.")
+    except (requests.RequestException, ValueError) as exc:
+        return Response({"error": {"message": f"Colab authorization could not be completed: {exc}"}}, status=status.HTTP_400_BAD_REQUEST)
+
+    provider_account_id = f"direct-{hashlib.sha256(email.encode('utf-8')).hexdigest()[:24]}"
+    account, _ = ConnectedAccount.objects.get_or_create(
+        user=request.user,
+        email=email,
+        defaults={"provider": "google", "provider_account_id": provider_account_id, "display_name": email},
+    )
+    account.provider = "google"
+    account.provider_account_id = provider_account_id
+    account.display_name = email
+    account.set_access_token(str(token_payload.get("token", "")))
+    account.set_refresh_token(str(token_payload.get("refresh_token", "")))
+    account.set_credential_json(json.dumps(token_payload))
+    account.scopes = token_payload.get("scopes") or []
+    account.status = AccountStatusChoices.ACTIVE
+    account.last_verified_at = timezone.now()
+    account.save()
+    _colab_auth_state_path(auth_id).unlink(missing_ok=True)
+    _COLAB_AUTH_PROCESSES.pop(auth_id, None)
+
+    log_audit_event(
+        action="auth.colab_cli_authorized",
+        resource_type="connected_account",
+        resource_id=str(account.id),
+        actor=request.user,
+        metadata={"email": email},
+        request=request,
+    )
+    return Response({"status": "active", "account": ConnectedAccountSerializer(account).data})
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])

@@ -80,6 +80,17 @@ export const integrationsClient = {
     return api.post('/integrations/colab/sessions/create/', data);
   },
 
+  startColabAuthorization: async (): Promise<{ authorization_id: string; authorization_url: string; expires_in_seconds: number; instruction: string }> => {
+    return api.post('/integrations/colab/authorize/start/', {});
+  },
+
+  completeColabAuthorization: async (authorizationId: string, callbackUrl: string): Promise<{ status: string; account: ConnectedAccount }> => {
+    return api.post('/integrations/colab/authorize/complete/', {
+      authorization_id: authorizationId,
+      callback_url: callbackUrl,
+    });
+  },
+
   listColabSessions: async (): Promise<{ output_raw: string; sessions: ColabSession[]; active_count: number; cli_error?: string }> => {
     return api.get('/integrations/colab/sessions/?include_drive_status=1');
   },

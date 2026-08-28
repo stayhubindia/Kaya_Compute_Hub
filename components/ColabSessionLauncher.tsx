@@ -17,6 +17,10 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
   const [activeSessions, setActiveSessions] = useState<ColabSession[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [authorizationId, setAuthorizationId] = useState<string | null>(null);
+  const [authorizationUrl, setAuthorizationUrl] = useState<string | null>(null);
+  const [callbackUrl, setCallbackUrl] = useState<string>('');
+  const [isAuthorizing, setIsAuthorizing] = useState<boolean>(false);
 
   const fetchAccountsAndSessions = async () => {
     try {
@@ -84,6 +88,38 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
     }
   };
 
+  const handleStartAuthorization = async () => {
+    setIsAuthorizing(true);
+    setErrorMessage(null);
+    try {
+      const result = await integrationsClient.startColabAuthorization();
+      setAuthorizationId(result.authorization_id);
+      setAuthorizationUrl(result.authorization_url);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Could not start Colab authorization.');
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
+
+  const handleCompleteAuthorization = async () => {
+    if (!authorizationId || !callbackUrl) return;
+    setIsAuthorizing(true);
+    setErrorMessage(null);
+    try {
+      const result = await integrationsClient.completeColabAuthorization(authorizationId, callbackUrl);
+      setAuthorizationId(null);
+      setAuthorizationUrl(null);
+      setCallbackUrl('');
+      setSuccessMessage(`Colab account '${result.account.email}' authorized on the VM.`);
+      await fetchAccountsAndSessions();
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Could not complete Colab authorization.');
+    } finally {
+      setIsAuthorizing(false);
+    }
+  };
+
   const variants = [
     { id: 'T4', name: 'NVIDIA T4 GPU', desc: 'Standard Free Tier GPU', color: '#0284c7' },
     { id: 'High-RAM', name: 'High-RAM T4', desc: 'High-RAM Compute Node', color: '#4f46e5' },
@@ -127,6 +163,23 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
           ⚠️ {errorMessage}
         </div>
       )}
+
+      <div style={{ background: '#0c4a6e22', border: '1px solid #0369a1', color: '#bae6fd', padding: '12px 16px', borderRadius: '10px', marginBottom: '16px', fontSize: '13px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+          <span>New account? Authorize the official Colab CLI on this VM; no client ID or secret is entered here.</span>
+          <button onClick={handleStartAuthorization} disabled={isAuthorizing || Boolean(authorizationId)} style={{ background: '#0369a1', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '6px', cursor: isAuthorizing || authorizationId ? 'not-allowed' : 'pointer', fontWeight: '600' }}>
+            {isAuthorizing ? 'Starting…' : 'Authorize Colab Account'}
+          </button>
+        </div>
+        {authorizationUrl && (
+          <div style={{ marginTop: '12px', display: 'grid', gap: '8px' }}>
+            <a href={authorizationUrl} target="_blank" rel="noreferrer" style={{ color: '#7dd3fc', fontWeight: '700', wordBreak: 'break-all' }}>1. Open Google authorization link</a>
+            <span>2. After approval, copy the complete <code>http://localhost:8200/?code=…&amp;state=…</code> URL from your browser address bar and paste it here.</span>
+            <input value={callbackUrl} onChange={(event) => setCallbackUrl(event.target.value)} placeholder="http://localhost:8200/?code=…&state=…" style={{ width: '100%', background: '#0f172a', color: '#f8fafc', border: '1px solid #334155', borderRadius: '6px', padding: '9px 10px', fontFamily: 'monospace' }} />
+            <button onClick={handleCompleteAuthorization} disabled={isAuthorizing || !callbackUrl} style={{ justifySelf: 'start', background: '#059669', color: '#fff', border: 'none', padding: '7px 12px', borderRadius: '6px', cursor: isAuthorizing || !callbackUrl ? 'not-allowed' : 'pointer', fontWeight: '600' }}>Complete authorization</button>
+          </div>
+        )}
+      </div>
 
       {/* Inputs Section */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px', marginBottom: '20px' }}>
