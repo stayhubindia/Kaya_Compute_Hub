@@ -15,10 +15,10 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.13
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.13"
 
       - name: Install Python Base Dependencies
         run: |
@@ -65,7 +65,7 @@ jobs:
         with:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
-          password: ${{ secrets.VM_PASSWORD }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
           script: |
             set -e
             echo "==== Deploying Kaya Compute Hub to /home/Project/Kaya_Compute_Hub ===="
@@ -84,7 +84,7 @@ jobs:
             if [ ! -d .venv ]; then
               python3 -m venv .venv
             fi
-            source .venv/bin/venv/activate || source .venv/bin/activate
+            source .venv/bin/activate
             pip install --upgrade pip
             pip install -r requirements/vm-base.lock
 
