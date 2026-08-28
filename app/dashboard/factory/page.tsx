@@ -4,8 +4,7 @@ import React, { useState, useEffect } from "react";
 import DashboardNavbar from "@/components/DashboardNavbar";
 import { User, authClient } from "@/lib/api/authClient";
 import { Job, jobsClient } from "@/lib/api/jobsClient";
-import { integrationsClient, ConnectedAccount } from "@/lib/api/integrations-client";
-import { downloadsClient } from "@/lib/api/downloadsClient";
+import { integrationsClient, ColabSession, ConnectedAccount } from "@/lib/api/integrations-client";
 import Link from "next/link";
 
 interface PipelinePayload {
@@ -52,7 +51,7 @@ export default function DatasetFactoryPage() {
   // Form State
   const [collectionSlug, setCollectionSlug] = useState("cybersecurity_v1");
   const [sourceName, setSourceName] = useState("arXiv Security Papers");
-  const [inputPath, setInputPath] = useState("/srv/kaya-data/raw_sources");
+  const [inputPath, setInputPath] = useState("/content/drive/MyDrive/Kaya_Compute_Hub/raw_sources");
   const [maxDocuments, setMaxDocuments] = useState(100);
   const [candidateCount, setCandidateCount] = useState(500);
   const [seed, setSeed] = useState(42);
@@ -75,6 +74,8 @@ export default function DatasetFactoryPage() {
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
+  const [colabSessions, setColabSessions] = useState<ColabSession[]>([]);
+  const [selectedSessionName, setSelectedSessionName] = useState("");
 
   // Load User, Jobs & Colab Vault Accounts
   const fetchJobs = async () => {
@@ -107,6 +108,16 @@ export default function DatasetFactoryPage() {
         // Vault accounts fetch silent fail
       }
 
+      try {
+        const sessionResponse = await integrationsClient.listColabSessions();
+        const sessions = (sessionResponse.sessions || []).filter((session) => /^[A-Za-z0-9_-]{1,64}$/.test(session.name));
+        setColabSessions(sessions);
+        const mounted = sessions.find((session) => session.drive_mounted === true);
+        setSelectedSessionName((mounted || sessions[0])?.name || "");
+      } catch {
+        // Factory prevents dispatch until a live session can be selected.
+      }
+
       await fetchJobs();
     }
     init();
@@ -119,16 +130,23 @@ export default function DatasetFactoryPage() {
     setIsSubmitting(true);
     setStatusMessage(null);
 
-    const jobTypeMap: Record<string, 'download' | 'extraction' | 'preprocessing' | 'notebook' | 'training' | 'evaluation'> = {
-      ingest: 'extraction',
-      generate: 'preprocessing',
-      qa: 'evaluation',
-      release: 'preprocessing',
-      train: 'training',
-      sync: 'notebook'
+    const jobTypeMap: Record<string, string> = {
+      ingest: 'ingest_documents',
+      generate: 'generate_candidates',
+      qa: 'run_quality_audit',
+      release: 'freeze_dataset',
+      train: 'train_qlora',
+      sync: 'sync_to_drive'
     };
 
     const mappedType = jobTypeMap[pipelineStage] || 'preprocessing';
+
+    const selectedSession = colabSessions.find((session) => session.name === selectedSessionName);
+    if (!selectedAccountId || !selectedSessionName || !selectedSession || selectedSession.drive_mounted !== true) {
+      setStatusMessage({ type: 'error', text: 'Select a live Colab session with Google Drive mounted before launching a Factory job.' });
+      setIsSubmitting(false);
+      return;
+    }
 
     try {
       const jobRes = await jobsClient.createJob({
@@ -139,13 +157,18 @@ export default function DatasetFactoryPage() {
           ...payload,
           pipeline_stage: pipelineStage,
           collection_slug: collectionSlug,
-          account_id: selectedAccountId || undefined
-        }
+          account_id: selectedAccountId,
+          execution_target: 'colab',
+          session_name: selectedSessionName,
+          accelerator: selectedSession.accelerator,
+          colab_data_root: '/content/drive/MyDrive/Kaya_Compute_Hub/data',
+        },
+        selected_google_account_id: selectedAccountId,
       });
 
       setStatusMessage({
         type: "success",
-        text: `🚀 Pipeline stage '${pipelineStage.toUpperCase()}' enqueued successfully! Job ID: ${jobRes.id}`,
+        text: `🚀 Pipeline stage '${pipelineStage.toUpperCase()}' is running on Colab session '${selectedSessionName}'. Job ID: ${jobRes.id}`,
       });
 
       await fetchJobs();
@@ -156,6 +179,67 @@ export default function DatasetFactoryPage() {
       });
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const buildArxivColabCode = () => `import pathlib, time, urllib.parse, urllib.request, xml.etree.ElementTree as ET
+output_dir = pathlib.Path(${JSON.stringify(arxivOutputDir)})
+output_dir.mkdir(parents=True, exist_ok=True)
+query = urllib.parse.urlencode({'search_query': 'cat:' + ${JSON.stringify(arxivCategory)}, 'start': 0, 'max_results': 100, 'sortBy': 'submittedDate', 'sortOrder': 'descending'})
+feed = urllib.request.urlopen('https://export.arxiv.org/api/query?' + query, timeout=60).read()
+root = ET.fromstring(feed)
+ns = {'atom': 'http://www.w3.org/2005/Atom'}
+entries = root.findall('atom:entry', ns)
+print('KAYA_PROGRESS=10|discovering|Found ' + str(len(entries)) + ' ArXiv records', flush=True)
+for index, entry in enumerate(entries, 1):
+    identifier = entry.findtext('atom:id', default='', namespaces=ns).rsplit('/', 1)[-1]
+    pdf_url = next((link.attrib.get('href') for link in entry.findall('atom:link', ns) if link.attrib.get('title') == 'pdf'), '')
+    if not pdf_url: continue
+    target = output_dir / (identifier.replace('/', '_') + '.pdf')
+    if not target.exists():
+        try: urllib.request.urlretrieve(pdf_url, target)
+        except Exception as exc: print('Download failed for ' + identifier + ': ' + str(exc), flush=True)
+    print('KAYA_PROGRESS=' + str(10 + int(index * 90 / max(1, len(entries)))) + '|downloading|Downloaded ' + str(index) + '/' + str(len(entries)), flush=True)
+    time.sleep(${JSON.stringify(arxivDelay)})
+print('KAYA_RESULT={"output_dir": ' + repr(str(output_dir)) + ', "records": ' + str(len(entries)) + '}', flush=True)`;
+
+  const handleStartArxivColabJob = async () => {
+    const selectedSession = colabSessions.find((session) => session.name === selectedSessionName);
+    if (!selectedAccountId || !selectedSession || selectedSession.drive_mounted !== true) {
+      setArxivStatus('❌ Select a live Colab session with Drive mounted before downloading.');
+      return;
+    }
+    setArxivRunning(true);
+    setArxivStats(null);
+    setArxivLogs([`[→] Dispatching ArXiv batch to Colab session ${selectedSessionName}`]);
+    try {
+      const data = await jobsClient.createJob({
+        name: `ArXiv download: ${arxivCategory} / ${arxivMonth}`,
+        job_type: 'custom_script',
+        selected_google_account_id: selectedAccountId,
+        payload: {
+          execution_target: 'colab', session_name: selectedSessionName,
+          accelerator: selectedSession.accelerator, timeout_seconds: 21600,
+          code: buildArxivColabCode(), output_dir: arxivOutputDir,
+        },
+      });
+      setArxivJobId(data.id);
+      setArxivStatus(`✅ Running in Colab: ${data.id.slice(0, 8)}...`);
+      const poll = setInterval(async () => {
+        try {
+          const job = await jobsClient.getJob(data.id);
+          setArxivStatus(`[${job.status.toUpperCase()}] ${job.progress_percentage}% — ${job.progress_message || 'Colab runtime working...'}`);
+          setArxivStats({ processed: job.progress_percentage, total: 100 });
+          if (['succeeded', 'failed', 'cancelled'].includes(job.status)) {
+            clearInterval(poll);
+            setArxivRunning(false);
+            setArxivLogs((previous) => [...previous, `[✓] Colab job finished: ${job.status}`]);
+          }
+        } catch { clearInterval(poll); setArxivRunning(false); }
+      }, 5000);
+    } catch (err: any) {
+      setArxivStatus(`❌ Submission error: ${err.message}`);
+      setArxivRunning(false);
     }
   };
 
@@ -196,7 +280,7 @@ export default function DatasetFactoryPage() {
             <div style={{ fontSize: '22px', fontWeight: '800', color: '#38bdf8', marginTop: '6px' }}>
               {recentJobs.filter((j) => ["queued", "running", "leased"].includes(j.status)).length} Running
             </div>
-            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Celery Worker Queue</div>
+            <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>Colab Runtime Queue</div>
           </div>
 
           <div style={{ background: '#0f172a', border: '1px solid #1e293b', padding: '20px', borderRadius: '12px' }}>
@@ -291,6 +375,28 @@ export default function DatasetFactoryPage() {
                   ⚠️ No Colab Accounts linked. Click to Register in Vault
                 </Link>
               )}
+            </div>
+
+            <div>
+              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#cbd5e1', marginBottom: '6px' }}>Live Colab Runtime (Drive required)</label>
+              {colabSessions.length > 0 ? (
+                <select
+                  value={selectedSessionName}
+                  onChange={(e) => setSelectedSessionName(e.target.value)}
+                  style={{ width: '100%', background: '#090d16', border: '1px solid #0284c7', borderRadius: '8px', padding: '10px 14px', color: '#38bdf8', fontWeight: '600', fontSize: '14px' }}
+                >
+                  {colabSessions.map((session) => (
+                    <option key={session.name} value={session.name}>
+                      {session.name} — {session.drive_mounted === true ? 'DRIVE MOUNTED' : 'DRIVE NOT MOUNTED'}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Link href="/dashboard/integrations" style={{ display: 'block', padding: '10px', background: 'rgba(217, 119, 6, 0.15)', border: '1px solid #d97706', color: '#fbbf24', borderRadius: '8px', fontSize: '12px', textDecoration: 'none', textAlign: 'center' }}>
+                  ⚠️ No live Colab runtime. Create and mount Drive in Integrations.
+                </Link>
+              )}
+              <p style={{ fontSize: '11px', color: '#94a3b8', margin: '6px 0 0' }}>Compute runs in this Colab kernel; the VM only dispatches and records logs.</p>
             </div>
           </div>
         </div>
@@ -431,46 +537,7 @@ export default function DatasetFactoryPage() {
               {/* Action Button */}
               <button
                 disabled={arxivRunning || !arxivCategory || !arxivMonth}
-                onClick={async () => {
-                  setArxivRunning(true);
-                  setArxivStats(null);
-                  setArxivStatus("Queuing batch download job...");
-                  setArxivLogs([`[→] Starting ArXiv batch: ${arxivCategory} / ${arxivMonth}`]);
-                  try {
-                    const data = await downloadsClient.startArxivBatch({
-                      category: arxivCategory,
-                      month: arxivMonth,
-                      workers: arxivWorkers,
-                      delay: arxivDelay,
-                      output_dir: arxivOutputDir,
-                    });
-                    if (data.job_id) {
-                      setArxivJobId(data.job_id);
-                      setArxivStatus(`✅ Job queued: ${data.job_id.slice(0,8)}...`);
-                      setArxivLogs(prev => [...prev, `[✓] Job ID: ${data.job_id}`, `[→] Polling progress...`]);
-                      // Poll progress every 5s
-                      const poll = setInterval(async () => {
-                        try {
-                          const sd = await downloadsClient.getArxivBatchStatus(data.job_id);
-                          const st = sd.arxiv_stats || {};
-                          setArxivStats(st);
-                          setArxivStatus(`[${sd.status?.toUpperCase()}] ${st.processed || 0}/${st.total || '?'} papers | HTML: ${st.html || 0} PDF: ${st.pdf || 0}`);
-                          if (sd.status === "succeeded" || sd.status === "failed" || sd.status === "cancelled" || st.status === "complete") {
-                            clearInterval(poll);
-                            setArxivRunning(false);
-                            setArxivLogs(prev => [...prev, `[✓] Job finished: ${sd.status}`]);
-                          }
-                        } catch { clearInterval(poll); setArxivRunning(false); }
-                      }, 5000);
-                    } else {
-                      setArxivStatus(`❌ Error: ${data.error?.message || "Unknown error"}`);
-                      setArxivRunning(false);
-                    }
-                  } catch (err: any) {
-                    setArxivStatus(`❌ Network error: ${err.message}`);
-                    setArxivRunning(false);
-                  }
-                }}
+                onClick={handleStartArxivColabJob}
                 style={{
                   background: arxivRunning ? '#334155' : 'linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%)',
                   color: '#fff', padding: '14px 28px', borderRadius: '10px', fontWeight: '700', border: 'none',

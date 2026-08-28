@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import re
 from apps.jobs.models import Job, JobStatusChoices, JobTypeChoices
 
 class JobSerializer(serializers.ModelSerializer):
@@ -41,13 +42,23 @@ class JobCreateSerializer(serializers.ModelSerializer):
 
     def validate(self, attrs):
         request = self.context['request']
-        payload = attrs.get('payload') or {}
+        payload = dict(attrs.get('payload') or {})
+        # Jobs are compute workloads, not VM workloads.  Always persist the
+        # explicit target so a worker can never silently fall back to local CPU.
+        payload['execution_target'] = 'colab'
+        attrs['payload'] = payload
         account_id = attrs.get('selected_google_account_id')
-        if payload.get('execution_target') == 'colab':
-            if not account_id:
-                raise serializers.ValidationError({'selected_google_account_id': 'Select an active Google account for Colab execution.'})
-            if not payload.get('code', '').strip():
-                raise serializers.ValidationError({'payload': 'Python code is required for a Colab job.'})
+        pipeline_types = {
+            JobTypeChoices.INGESTION, JobTypeChoices.GENERATION,
+            JobTypeChoices.QUALITY_AUDIT, JobTypeChoices.FREEZE_DATASET,
+            JobTypeChoices.TRAINING_QLORA, JobTypeChoices.SYNC_DRIVE,
+        }
+        if not account_id:
+            raise serializers.ValidationError({'selected_google_account_id': 'Select an active Google account for Colab execution.'})
+        if not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', str(payload.get('session_name', ''))):
+            raise serializers.ValidationError({'payload': 'Select a valid live Colab session for execution.'})
+        if attrs.get('job_type') not in pipeline_types and not payload.get('code', '').strip():
+            raise serializers.ValidationError({'payload': 'Python code is required for this Colab job.'})
         if account_id:
             from apps.integrations.models import ConnectedAccount, AccountStatusChoices
             account = ConnectedAccount.objects.filter(id=account_id, user=request.user).first()

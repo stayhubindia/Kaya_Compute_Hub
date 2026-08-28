@@ -15,6 +15,60 @@ class ColabExecutionError(RuntimeError):
     pass
 
 
+_PIPELINE_JOB_TYPES = {
+    "ingest_documents",
+    "generate_candidates",
+    "run_quality_audit",
+    "freeze_dataset",
+    "train_qlora",
+    "sync_to_drive",
+}
+
+
+def _build_colab_pipeline_code(job_type: str, payload: dict) -> str:
+    """Build the small launcher executed *inside* the selected Colab kernel.
+
+    The VM only invokes ``colab exec`` and records the result.  Source checkout,
+    dependency installation, data processing and artifact writes all happen in
+    Colab, with the collection root stored on the mounted Drive.
+    """
+    safe_payload = dict(payload)
+    safe_payload.pop("code", None)
+    payload_json = json.dumps(safe_payload)
+    repository = os.environ.get("KAYA_COLAB_REPOSITORY", "https://github.com/stayhubindia/Kaya_Compute_Hub.git")
+    data_root = safe_payload.get("colab_data_root", "/content/drive/MyDrive/Kaya_Compute_Hub/data")
+    return f'''import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+REPOSITORY = {repository!r}
+REPO_DIR = Path('/content/kaya-compute-hub')
+DATA_ROOT = {str(data_root)!r}
+PAYLOAD = json.loads({payload_json!r})
+
+if not Path('/content/drive/MyDrive').is_dir():
+    raise RuntimeError('Google Drive is not mounted in this Colab session. Mount Drive from Console or Integrations first.')
+
+if not REPO_DIR.exists():
+    subprocess.run(['git', 'clone', '--depth', '1', REPOSITORY, str(REPO_DIR)], check=True)
+
+requirements = REPO_DIR / 'requirements-pipeline.txt'
+subprocess.run([sys.executable, '-m', 'pip', 'install', '--quiet', '-r', str(requirements)], check=True)
+sys.path.insert(0, str(REPO_DIR))
+os.environ['DATA_ROOT'] = DATA_ROOT
+
+from services.worker.executors.pipeline_executor import run_pipeline_executor
+
+def report(percent, stage, message):
+    print(f'KAYA_PROGRESS={{percent}}|{{stage}}|{{message}}', flush=True)
+
+result = run_pipeline_executor({job_type!r}, PAYLOAD, report)
+print('KAYA_RESULT=' + json.dumps(result, default=str), flush=True)
+'''
+
+
 def _colab_binary() -> str:
     configured = os.environ.get("COLAB_CLI_BIN", "").strip()
     if configured:
@@ -81,6 +135,8 @@ def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> d
     """Create/reuse a Colab session and execute the job's Python code from the VM."""
     payload = job.payload or {}
     code = payload.get("code", "").strip()
+    if not code and job.job_type in _PIPELINE_JOB_TYPES:
+        code = _build_colab_pipeline_code(job.job_type, payload)
     if not code:
         raise ColabExecutionError("Colab job payload must contain Python code.")
 
@@ -90,7 +146,7 @@ def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> d
     colab_bin = _colab_binary()
     lock_path = Path(tempfile.gettempdir()) / "kaya-colab-cli.lock"
 
-    update_progress_cb(5, "colab_auth", "Activating selected Google account on the VM")
+    update_progress_cb(5, "colab_auth", "Activating selected Google account for Colab dispatch")
     with lock_path.open("w") as lock_file:
         fcntl.flock(lock_file, fcntl.LOCK_EX)
         _activate_account(job.selected_google_account)
@@ -110,7 +166,7 @@ def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> d
                 message = (created.stderr or created.stdout).strip()
                 raise ColabExecutionError(f"Colab session allocation failed: {message}")
 
-        update_progress_cb(30, "colab_running", "VM dispatched the Python task to Colab")
+        update_progress_cb(30, "colab_running", "Python task is running inside the Colab runtime")
         script_path = None
         try:
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as script:
@@ -133,7 +189,7 @@ def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> d
     if result.returncode != 0:
         raise ColabExecutionError((result.stderr or result.stdout or "Colab execution failed").strip())
 
-    update_progress_cb(100, "completed", "Colab task completed; output returned to the VM")
+    update_progress_cb(100, "completed", "Colab task completed; VM stored only status and logs")
     return {
         "execution_target": "colab",
         "session_name": session_name,

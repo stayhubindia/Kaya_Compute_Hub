@@ -45,7 +45,7 @@ export const jobsClient = {
     });
   },
 
-  async createJob(payload: { name: string; description?: string; job_type: string; payload?: Record<string, any>; priority?: number }, signal?: AbortSignal): Promise<{ id: string; status: string; message: string }> {
+  async createJob(payload: { name: string; description?: string; job_type: string; payload?: Record<string, any>; priority?: number; selected_google_account_id?: string }, signal?: AbortSignal): Promise<{ id: string; status: string; message: string }> {
     return apiClient<{ id: string; status: string; message: string }>('/jobs/', {
       method: 'POST',
       body: JSON.stringify(payload),

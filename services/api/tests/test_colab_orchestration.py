@@ -92,6 +92,36 @@ def test_ui_submission_persists_colab_routing_metadata():
 
 
 @pytest.mark.django_db
+def test_pipeline_job_is_colab_only_and_uses_the_selected_session():
+    admin = User.objects.create_admin('pipeline@kaya.local', 'Pass123!')
+    account = ConnectedAccount.objects.create(
+        user=admin,
+        provider='google',
+        provider_account_id='pipeline-123',
+        email='pipeline@gmail.com',
+        status=AccountStatusChoices.ACTIVE,
+    )
+    client = APIClient()
+    client.force_authenticate(user=admin)
+
+    with patch('apps.jobs.views.execute_job.delay'):
+        response = client.post('/api/v1/jobs/', {
+            'name': 'Colab ingestion',
+            'job_type': 'ingest_documents',
+            'selected_google_account_id': str(account.id),
+            'payload': {
+                'session_name': 'dataset-runtime',
+                'input_path': '/content/drive/MyDrive/Kaya_Compute_Hub/raw_sources',
+            },
+        }, format='json')
+
+    assert response.status_code == 201
+    job = Job.objects.get(id=response.json()['id'])
+    assert job.payload['execution_target'] == 'colab'
+    assert job.payload['session_name'] == 'dataset-runtime'
+
+
+@pytest.mark.django_db
 def test_colab_activation_rejects_drive_only_credentials():
     admin = User.objects.create_admin('drive-only@kaya.local', 'Pass123!')
     account = ConnectedAccount.objects.create(
