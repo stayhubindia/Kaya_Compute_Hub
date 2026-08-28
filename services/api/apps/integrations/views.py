@@ -75,6 +75,15 @@ def _parse_colab_sessions(output: str) -> list[dict]:
     return sessions
 
 
+def _extract_drive_authorization_url(output: str) -> str:
+    """Ignore Colab status URLs; accept only the URL after Drive asks for consent."""
+    marker = "REQUIRED: Google Drive Authorization needed"
+    if marker not in output:
+        return ""
+    match = _COLAB_INTERACTIVE_URL.search(output.split(marker, 1)[1])
+    return match.group(0).rstrip(".,)") if match else ""
+
+
 def _probe_drive_mount(colab_bin: str, session_name: str) -> bool | None:
     """Ask a live Colab kernel whether its Drive FUSE mount is present."""
     probe = Path("/tmp") / f"kaya-drive-probe-{uuid.uuid4().hex}.py"
@@ -309,14 +318,15 @@ def colab_drive_mount_start(request):
         text=True, start_new_session=True,
     )
     consent_url = ""
+    output = ""
     deadline = time.monotonic() + 25
     while time.monotonic() < deadline and process.poll() is None:
         readable, _, _ = select.select([process.stdout], [], [], 0.5)
         if not readable:
             continue
-        match = _COLAB_INTERACTIVE_URL.search(process.stdout.readline())
-        if match:
-            consent_url = match.group(0).rstrip(".,)")
+        output += process.stdout.readline()
+        consent_url = _extract_drive_authorization_url(output)
+        if consent_url:
             break
     if not consent_url:
         process.terminate()

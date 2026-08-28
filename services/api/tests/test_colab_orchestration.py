@@ -6,7 +6,7 @@ from rest_framework.test import APIClient
 from apps.accounts.models import User
 from apps.integrations.models import ConnectedAccount, AccountStatusChoices
 from apps.jobs.models import Job
-from apps.integrations.views import _parse_colab_sessions
+from apps.integrations.views import _extract_drive_authorization_url, _parse_colab_sessions
 from services.worker.executors.colab_executor import ColabExecutionError, _activate_account
 
 
@@ -27,6 +27,16 @@ def test_colab_session_parser_ignores_cli_notices_and_no_session_message():
         'variant': 'GPU',
         'status': 'IDLE',
     }]
+
+
+def test_drive_authorization_url_ignores_colab_status_url():
+    output = """[colab] Intercepted Drive Auth Request. Connecting to https://colab.research.google.com/...
+[colab] REQUIRED: Google Drive Authorization needed.
+Please visit:
+
+https://accounts.google.com/o/oauth2/auth?drive-consent-code
+"""
+    assert _extract_drive_authorization_url(output) == 'https://accounts.google.com/o/oauth2/auth?drive-consent-code'
 
 
 @pytest.mark.django_db
