@@ -33,12 +33,12 @@ The supplied platform integration archive contains 292 files spanning 8 core dom
 | :--- | :--- | :--- |
 | `scripts/colab_account_manager.py` | Copies `~/.config/colab-cli/token.json` files and performs automatic multi-account rotation on rate limits / quota errors. | **QUARANTINED / DEPRECATED**. Automatic failover and token copy are strictly forbidden. No token-vault or rate-limit bypass. |
 | `scripts/run_colab_job.py` | Automates private browser/CLI Colab sessions using copied credentials. | **REPLACED**. Supported Google Cloud / Colab Enterprise REST connector or local VM GPU execution only. |
-| `MULTI_ACCOUNT_COLAB_GUIDE.md` | Documents multi-account token harvesting and quota evasion tricks. | **QUARANTINED**. Replaced by single-admin PKCE Google OAuth connection standard. |
+| `MULTI_ACCOUNT_COLAB_GUIDE.md` | Documents direct Colab CLI token-vault account management. | **REFERENCE**. The dashboard imports credentials explicitly; it does not perform account login or automatic harvesting. |
 | `src/panel/server.py` | Unauthenticated subprocess execution, arbitrary path input, permissive CORS (`*`), in-memory jobs. | **REPLACED**. Replaced by single-admin Django API (`/api/v1/jobs/`) with strict typed payload allowlisting and CSRF enforcement. |
 
 ### 2.2 Enforced Compliance Policy
 1. **Single Local Administrator**: The web panel permits exactly **one** local admin account authenticated by email + password. No public signup, team roles, or TOTP flow.
-2. **External OAuth Identity Binding**: Google accounts (`ConnectedAccount`) are external compute/storage connections managed via server-side OAuth 2.0 with PKCE and AES-encrypted refresh tokens.
+2. **Direct Google Credential Binding**: Google accounts (`ConnectedAccount`) are external compute/storage connections managed through explicit Colab CLI token import and encrypted credential storage.
 3. **Explicit Connection Selection**: Every Google Drive or Colab job must specify an explicitly selected connection. On 401/403/412/429/503 errors, the job is **paused** and recorded; silent account switching is strictly prohibited.
 
 ---

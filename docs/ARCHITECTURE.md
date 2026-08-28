@@ -41,7 +41,7 @@ Persistent Storage (Artifacts, Datasets, Checkpoints, Logs)
 - **Argon2 Password Hashing**: Passwords are saved exclusively as strong Argon2 password hashes.
 - **Rate Limiting**: Throttling enforced on login requests (`10/minute`).
 - **CSRF Protection**: State-changing requests enforce standard Django CSRF token headers (`X-CSRFToken`).
-- **External Integration Accounts**: Connected Google Accounts for Google Drive and Colab Enterprise (`ConnectedAccount`) remain isolated external OAuth integrations and cannot be used to log into the panel.
+- **External Integration Accounts**: Connected Google Drive and Colab CLI accounts (`ConnectedAccount`) remain isolated integration credentials and cannot be used to log into the panel.
 
 ---
 

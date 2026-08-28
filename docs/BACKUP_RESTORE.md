@@ -30,6 +30,6 @@ sha256sum -c checksums.sha256
 
 ---
 
-## 3. Secret & OAuth Token Vault Recovery
+## 3. Secret & Direct Credential Vault Recovery
 - Connected account refresh tokens are stored encrypted in PostgreSQL using Django's Fernet-based field encryption.
 - Ensure `SECRET_KEY` and `ENCRYPTION_KEY` in `.env` are safely backed up in a secure secret manager.
