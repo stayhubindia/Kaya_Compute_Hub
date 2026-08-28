@@ -1,33 +1,8 @@
 import pytest
-from datetime import timedelta
-from django.utils import timezone
 from django.urls import reverse
 from rest_framework import status
 from apps.accounts.models import User
-from apps.integrations.models import ConnectedAccount, AccountStatusChoices, OAuthState, ExternalNotebook, ExternalRun
-
-@pytest.mark.django_db
-def test_google_oauth_start_endpoint(client):
-    admin = User.objects.create_admin(email="oauth_user@example.com", password="Password123!")
-    client.force_login(admin)
-
-    url = reverse("google-oauth-start")
-    response = client.get(url)
-    assert response.status_code == status.HTTP_200_OK
-    assert "authorization_url" in response.data
-    assert "state" in response.data
-
-    # Verify OAuthState record persisted
-    state_rec = OAuthState.objects.get(state=response.data["state"])
-    assert state_rec.user == admin
-    assert state_rec.code_verifier is not None
-
-@pytest.mark.django_db
-def test_google_oauth_callback_invalid_state(client):
-    url = reverse("google-oauth-callback") + "?state=invalid_state_123&code=sample_code"
-    response = client.get(url)
-    assert response.status_code == status.HTTP_400_BAD_REQUEST
-    assert "Invalid or expired" in response.data["error"]["message"]
+from apps.integrations.models import ConnectedAccount, AccountStatusChoices, ExternalNotebook, ExternalRun
 
 @pytest.mark.django_db
 def test_google_accounts_list(client):
@@ -43,6 +18,23 @@ def test_google_accounts_list(client):
     assert len(data) == 1
     assert data[0]["id"] == str(acc1.id)
     assert data[0]["email"] == "u1@gmail.com"
+
+@pytest.mark.django_db
+def test_direct_colab_token_import(client):
+    admin = User.objects.create_admin(email="direct@example.com", password="Password123!")
+    client.force_login(admin)
+    response = client.post(
+        reverse("google-account-direct-connect"),
+        {
+            "email": "drive@example.com",
+            "raw_json": '{"token":"access-token","refresh_token":"refresh-token","scopes":["drive"]}',
+        },
+        format="json",
+    )
+    assert response.status_code == status.HTTP_201_CREATED
+    account = ConnectedAccount.objects.get(email="drive@example.com")
+    assert account.get_access_token() == "access-token"
+    assert "refresh_token" in account.get_credential_json()
 
 @pytest.mark.django_db
 def test_colab_enterprise_register_and_run(client):
@@ -71,19 +63,6 @@ def test_colab_enterprise_register_and_run(client):
     res_run = client.post(run_url, {"output_uri": "gs://test-bucket/output"}, format="json")
     assert res_run.status_code == status.HTTP_201_CREATED
     assert res_run.data["status"] == "requested"
-
-@pytest.mark.django_db
-def test_google_account_reconnect_endpoint(client):
-    admin = User.objects.create_admin(email="rec_user@example.com", password="Password123!")
-    acc = ConnectedAccount.objects.create(user=admin, provider="google", provider_account_id="sub_rec", email="rec@gmail.com")
-
-    client.force_login(admin)
-
-    url = reverse("google-account-reconnect", kwargs={"pk": acc.id})
-    res = client.post(url)
-    assert res.status_code == status.HTTP_200_OK
-    assert "authorization_url" in res.data
-    assert "state" in res.data
 
 @pytest.mark.django_db
 def test_selected_google_account_quota_exhausted_rejection(client):

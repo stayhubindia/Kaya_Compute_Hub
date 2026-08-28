@@ -4,6 +4,7 @@ import uuid
 import json
 import shutil
 import subprocess
+import hashlib
 from pathlib import Path
 from datetime import timedelta
 
@@ -18,8 +19,6 @@ def _get_colab_bin() -> str:
         return which_colab
     return "colab"
 from django.utils import timezone
-from django.shortcuts import redirect
-from django.http import HttpResponseRedirect
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import api_view, permission_classes, action
 from rest_framework.response import Response
@@ -27,7 +26,6 @@ from rest_framework.response import Response
 from apps.integrations.models import (
     ConnectedAccount,
     AccountStatusChoices,
-    OAuthState,
     ExternalNotebook,
     ExternalRun
 )
@@ -37,170 +35,11 @@ from apps.integrations.serializers import (
     ExternalRunSerializer
 )
 from apps.audit.services import log_audit_event
-from services.integrations.google.oauth import (
-    generate_pkce_pair,
-    generate_state,
-    get_authorization_url,
-    exchange_code_for_tokens,
-    refresh_access_token,
-    fetch_google_userinfo,
-    revoke_token
-)
 from services.integrations.google.drive_client import GoogleDriveClient
 from services.integrations.colab_enterprise.client import ColabEnterpriseClient
 from services.integrations.colab_enterprise.executions import ExternalRunStatus
-from services.integrations.google.errors import GoogleOAuthError, TokenRevokedError, GoogleDriveError
+from services.integrations.google.errors import GoogleDriveError
 from services.worker.executors.colab_executor import _activate_account, _cli
-
-# --- Colab Account & Vault Endpoints ---
-
-
-def _oauth_start_response(request):
-    redirect_uri = os.environ.get(
-        "GOOGLE_OAUTH_REDIRECT_URI",
-        request.build_absolute_uri('/api/v1/integrations/google/callback/')
-    )
-    verifier, challenge = generate_pkce_pair()
-    state_value = generate_state()
-    oauth_state = OAuthState.objects.create(
-        state=state_value,
-        user=request.user,
-        code_verifier=verifier,
-        redirect_uri=redirect_uri,
-        scopes=[],
-        expires_at=timezone.now() + timedelta(minutes=10),
-    )
-    authorization_url = get_authorization_url(
-        state=oauth_state.state,
-        code_challenge=challenge,
-        redirect_uri=redirect_uri,
-    )
-    return {
-        "auth_url": authorization_url,
-        "authorization_url": authorization_url,
-        "state": oauth_state.state,
-        "expires_at": oauth_state.expires_at.isoformat(),
-    }
-
-
-def _save_google_account(user, tokens, request=None):
-    access_token = tokens.get('access_token', '')
-    if not access_token:
-        raise GoogleOAuthError("Google did not return an access token.")
-    userinfo = fetch_google_userinfo(access_token)
-    provider_account_id = userinfo.get('sub')
-    if not provider_account_id:
-        raise GoogleOAuthError("Google user profile did not contain an account id.")
-
-    account, _ = ConnectedAccount.objects.get_or_create(
-        user=user,
-        provider='google',
-        provider_account_id=provider_account_id,
-    )
-    account.email = userinfo.get('email', '')
-    account.display_name = userinfo.get('name') or account.email
-    account.set_access_token(access_token)
-    account.set_refresh_token(tokens.get('refresh_token', ''))
-    account.token_expiry = timezone.now() + timedelta(seconds=tokens.get('expires_in', 3600))
-    account.scopes = tokens.get('scope', '').split()
-    account.status = AccountStatusChoices.ACTIVE
-    account.last_verified_at = timezone.now()
-    account.disconnected_at = None
-    account.save()
-    log_audit_event(
-        action="auth.google_account_connected",
-        resource_type="connected_account",
-        resource_id=str(account.id),
-        actor=user,
-        metadata={"email": account.email},
-        request=request,
-    )
-    return account
-
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def google_oauth_start(request):
-    try:
-        return Response(_oauth_start_response(request))
-    except GoogleOAuthError as exc:
-        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-
-@api_view(['GET'])
-@permission_classes([permissions.AllowAny])
-def google_oauth_callback(request):
-    state_value = request.query_params.get('state', '')
-    code = request.query_params.get('code', '')
-    oauth_state = OAuthState.objects.filter(
-        state=state_value,
-        expires_at__gt=timezone.now(),
-    ).first()
-    if not oauth_state:
-        return Response({"error": {"message": "Invalid or expired OAuth state."}}, status=status.HTTP_400_BAD_REQUEST)
-    if not code:
-        return Response({"error": {"message": "Google authorization code is missing."}}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        tokens = exchange_code_for_tokens(code, oauth_state.code_verifier, oauth_state.redirect_uri)
-        account = _save_google_account(oauth_state.user, tokens, request=request)
-        oauth_state.delete()
-        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip('/')
-        return redirect(f"{frontend_url}/dashboard/settings/connections?google=connected&account={account.id}")
-    except GoogleOAuthError as exc:
-        return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def google_colab_auth_link(request):
-    """Generate a short-lived PKCE Google authorization URL."""
-    try:
-        return Response(_oauth_start_response(request))
-    except GoogleOAuthError as exc:
-        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def google_colab_verify_code(request):
-    """
-    Exchanges pasted Colab authorization code for official access/refresh tokens,
-    saves the account to ConnectedAccount DB and creates local Vault JSON file.
-    """
-    code = request.data.get('code', '').strip()
-    state_value = request.data.get('state', '').strip()
-
-    if not code:
-        return Response({"error": {"message": "Authorization code is required."}}, status=status.HTTP_400_BAD_REQUEST)
-
-    oauth_state = OAuthState.objects.filter(
-        user=request.user,
-        state=state_value,
-        expires_at__gt=timezone.now(),
-    ).first() if state_value else OAuthState.objects.filter(
-        user=request.user,
-        expires_at__gt=timezone.now(),
-    ).order_by('-created_at').first()
-    if not oauth_state:
-        return Response({"error": {"message": "Authorization session expired. Generate a new link."}}, status=status.HTTP_400_BAD_REQUEST)
-    try:
-        tokens = exchange_code_for_tokens(code, oauth_state.code_verifier, oauth_state.redirect_uri)
-        account = _save_google_account(request.user, tokens, request=request)
-        oauth_state.delete()
-        return Response(ConnectedAccountSerializer(account).data, status=status.HTTP_200_OK)
-    except GoogleOAuthError as exc:
-        return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def google_account_reconnect(request, pk):
-    if not ConnectedAccount.objects.filter(pk=pk, user=request.user).exists():
-        return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
-    try:
-        return Response(_oauth_start_response(request))
-    except GoogleOAuthError as exc:
-        return Response({"error": {"message": str(exc)}}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -228,17 +67,11 @@ def google_account_verify(request, pk):
         safe_filename = (account.email or "").replace("@", "_at_")
         vault_file = Path.home() / f".config/colab-cli/saved_accounts/{safe_filename}.json"
 
-        if refresh_token:
-            try:
-                tokens = refresh_access_token(refresh_token)
-                new_access = tokens.get('access_token')
-                expires_in = tokens.get('expires_in', 3600)
-                account.set_access_token(new_access)
-                account.token_expiry = timezone.now() + timedelta(seconds=expires_in)
-            except Exception:
-                pass
-
         if access_token or refresh_token or vault_file.exists():
+            if access_token:
+                # A real Drive API request verifies that this imported token
+                # belongs to a usable Drive account.
+                GoogleDriveClient(access_token).get_about()
             account.status = AccountStatusChoices.ACTIVE
             account.last_verified_at = timezone.now()
             account.save()
@@ -296,12 +129,9 @@ def google_account_revoke(request, pk):
     except ConnectedAccount.DoesNotExist:
         return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
-    raw_refresh = account.get_refresh_token()
-    raw_access = account.get_access_token()
-    revoke_token(raw_refresh or raw_access)
-
     account.encrypted_access_token = ''
     account.encrypted_refresh_token = ''
+    account.encrypted_credential_json = ''
     account.status = AccountStatusChoices.REVOKED
     account.disconnected_at = timezone.now()
     account.save()
@@ -326,16 +156,35 @@ def google_account_direct_connect(request):
     Direct token/credential vault entry for Google Drive & Colab accounts without web OAuth popup redirect.
     Saves to ConnectedAccount model and syncs to ~/.config/colab-cli/saved_accounts/<email>.json.
     """
-    email = request.data.get('email', '').strip()
+    email = request.data.get('email', '').strip().lower()
     display_name = request.data.get('display_name', '').strip() or email
     access_token = request.data.get('access_token', '').strip()
     refresh_token = request.data.get('refresh_token', '').strip()
     raw_json = request.data.get('raw_json', '')
 
+    # Import the token.json produced by the account's official Colab CLI.
+    # This is a direct credential import; no client id, callback or OAuth app
+    # registration is involved.
+    credential_payload = {}
+    if isinstance(raw_json, dict):
+        credential_payload = raw_json
+        raw_json = json.dumps(raw_json)
+    elif raw_json:
+        try:
+            credential_payload = json.loads(raw_json)
+        except (TypeError, ValueError):
+            return Response({"error": {"message": "raw_json must be valid Colab CLI token JSON."}}, status=status.HTTP_400_BAD_REQUEST)
+    if not isinstance(credential_payload, dict):
+        credential_payload = {}
+    access_token = access_token or str(credential_payload.get('token') or credential_payload.get('access_token') or '').strip()
+    refresh_token = refresh_token or str(credential_payload.get('refresh_token') or '').strip()
+    if not access_token and not refresh_token:
+        return Response({"error": {"message": "Import a Colab CLI token.json containing token or refresh_token."}}, status=status.HTTP_400_BAD_REQUEST)
+
     if not email:
         return Response({"error": {"message": "Email address is required."}}, status=status.HTTP_400_BAD_REQUEST)
 
-    provider_account_id = f"manual-{uuid.uuid4().hex[:12]}"
+    provider_account_id = f"direct-{hashlib.sha256(email.encode('utf-8')).hexdigest()[:24]}"
     
     account, created = ConnectedAccount.objects.get_or_create(
         user=request.user,
@@ -352,11 +201,20 @@ def google_account_direct_connect(request):
         account.set_access_token(access_token)
     if refresh_token:
         account.set_refresh_token(refresh_token)
-    
+    if raw_json:
+        account.set_credential_json(raw_json)
     account.status = AccountStatusChoices.ACTIVE
-    account.token_expiry = timezone.now() + timedelta(days=365)
+    expiry_value = credential_payload.get('expiry') or credential_payload.get('token_expiry')
+    if expiry_value:
+        try:
+            account.token_expiry = timezone.datetime.fromisoformat(str(expiry_value).replace('Z', '+00:00'))
+        except ValueError:
+            account.token_expiry = None
+    else:
+        account.token_expiry = None
     account.last_verified_at = timezone.now()
-    account.scopes = ["drive.file", "colab"]
+    scopes = credential_payload.get('scopes') or ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/colaboratory"]
+    account.scopes = scopes.split() if isinstance(scopes, str) else scopes
     account.save()
 
     # Sync to local Vault directory ~/.config/colab-cli/saved_accounts/ for Colab account manager
@@ -366,14 +224,14 @@ def google_account_direct_connect(request):
         safe_filename = email.replace("@", "_at_")
         vault_file = vault_dir / f"{safe_filename}.json"
         
-        token_data = {
-            "email": email,
-            "access_token": access_token or "direct_token",
-            "refresh_token": refresh_token or "",
-            "raw_json": raw_json,
-            "created_at": timezone.now().isoformat()
-        }
-        vault_file.write_text(json.dumps(token_data, indent=2))
+        token_data = dict(credential_payload)
+        token_data["email"] = email
+        token_data["token"] = access_token
+        token_data["refresh_token"] = refresh_token
+        token_data["scopes"] = account.scopes
+        token_data["created_at"] = timezone.now().isoformat()
+        vault_file.write_text(json.dumps(token_data, indent=2), encoding='utf-8')
+        vault_file.chmod(0o600)
     except Exception:
         pass
 
@@ -402,17 +260,6 @@ def google_drive_list_files(request, pk):
         return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
     access_token = account.get_access_token()
-    refresh_token = account.get_refresh_token()
-
-    if refresh_token:
-        try:
-            tokens = refresh_access_token(refresh_token)
-            if tokens and 'access_token' in tokens:
-                access_token = tokens['access_token']
-                account.set_access_token(access_token)
-                account.save()
-        except Exception:
-            pass
 
     client = GoogleDriveClient(access_token)
 
@@ -437,17 +284,6 @@ def google_drive_file_details(request, pk, file_id):
         return Response({"error": {"message": "Account not found."}}, status=status.HTTP_404_NOT_FOUND)
 
     access_token = account.get_access_token()
-    refresh_token = account.get_refresh_token()
-
-    if refresh_token:
-        try:
-            tokens = refresh_access_token(refresh_token)
-            if tokens and 'access_token' in tokens:
-                access_token = tokens['access_token']
-                account.set_access_token(access_token)
-                account.save()
-        except Exception:
-            pass
 
     client = GoogleDriveClient(access_token)
 

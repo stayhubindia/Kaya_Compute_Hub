@@ -61,6 +61,15 @@ class GoogleDriveClient:
         resp = self._request_with_retry("GET", url, params=params)
         return resp.json()
 
+    def get_about(self) -> Dict[str, Any]:
+        """Verify the imported credential and return the Drive account profile."""
+        resp = self._request_with_retry(
+            "GET",
+            f"{DRIVE_API_BASE}/about",
+            params={"fields": "user(displayName,emailAddress,permissionId),storageQuota"},
+        )
+        return resp.json()
+
     def get_file_metadata(self, file_id: str) -> Dict[str, Any]:
         """Get file metadata for specific fileId."""
         url = f"{DRIVE_API_BASE}/files/{file_id}"

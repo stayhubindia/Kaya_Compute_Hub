@@ -1,64 +1,30 @@
 import os
 import hashlib
-from datetime import timedelta
 from django.utils import timezone
 from celery import shared_task
-from apps.integrations.models import ConnectedAccount, AccountStatusChoices, OAuthState, ExternalRun
+from apps.integrations.models import ConnectedAccount, AccountStatusChoices, ExternalRun
 from apps.datasets.models import Dataset
 from apps.artifacts.models import Artifact
 from apps.accounts.models import User
-from services.integrations.google.oauth import refresh_access_token
 from services.integrations.google.drive_client import GoogleDriveClient
 from services.integrations.colab_enterprise.client import ColabEnterpriseClient
 from services.integrations.colab_enterprise.executions import ExternalRunStatus, map_colab_state_to_run_status
 
-@shared_task(name="integrations.refresh_expiring_google_tokens", bind=True, max_retries=3)
-def refresh_expiring_google_tokens(self):
-    """Refresh Google OAuth access tokens that expire in <10 minutes."""
-    threshold = timezone.now() + timedelta(minutes=10)
-    expiring_accounts = ConnectedAccount.objects.filter(
-        provider='google',
-        status=AccountStatusChoices.ACTIVE,
-        token_expiry__lte=threshold
-    )
-
-    refreshed_count = 0
-    for account in expiring_accounts:
-        refresh_token = account.get_refresh_token()
-        if not refresh_token:
-            account.status = AccountStatusChoices.EXPIRED
-            account.save()
-            continue
-
-        try:
-            tokens = refresh_access_token(refresh_token)
-            account.set_access_token(tokens['access_token'])
-            expires_in = tokens.get('expires_in', 3600)
-            account.token_expiry = timezone.now() + timedelta(seconds=expires_in)
-            account.last_verified_at = timezone.now()
-            account.save()
-            refreshed_count += 1
-        except Exception as e:
-            account.status = AccountStatusChoices.ERROR
-            account.save()
-
-    return {"refreshed_count": refreshed_count}
-
-
 @shared_task(name="integrations.verify_connected_accounts", bind=True)
 def verify_connected_accounts(self):
-    """Verify health of connected accounts."""
+    """Verify imported Drive credentials without refreshing through an OAuth app."""
     active_accounts = ConnectedAccount.objects.filter(status=AccountStatusChoices.ACTIVE)
-    return {"active_count": active_accounts.count()}
-
-
-@shared_task(name="integrations.clean_expired_oauth_states", bind=True)
-def clean_expired_oauth_states(self):
-    """Purge expired OAuthState records."""
-    expired = OAuthState.objects.filter(expires_at__lt=timezone.now())
-    count = expired.count()
-    expired.delete()
-    return {"purged_count": count}
+    verified = 0
+    for account in active_accounts:
+        try:
+            GoogleDriveClient(account.get_access_token()).get_about()
+            account.last_verified_at = timezone.now()
+            account.save(update_fields=['last_verified_at', 'updated_at'])
+            verified += 1
+        except Exception:
+            account.status = AccountStatusChoices.EXPIRED
+            account.save(update_fields=['status', 'updated_at'])
+    return {"active_count": active_accounts.count(), "verified_count": verified}
 
 
 @shared_task(name="integrations.import_google_drive_file_task", bind=True, max_retries=3)

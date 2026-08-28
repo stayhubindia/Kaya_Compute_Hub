@@ -21,6 +21,9 @@ class ConnectedAccount(models.Model):
     display_name = models.CharField(max_length=255, blank=True, default='')
     encrypted_access_token = models.TextField(blank=True, default='')
     encrypted_refresh_token = models.TextField(blank=True, default='')
+    # Complete Colab CLI token payload, encrypted so direct-import credentials
+    # (including provider metadata) survive account activation without OAuth.
+    encrypted_credential_json = models.TextField(blank=True, default='')
     token_expiry = models.DateTimeField(null=True, blank=True)
     scopes = models.JSONField(default=list)
     status = models.CharField(max_length=30, choices=AccountStatusChoices.choices, default=AccountStatusChoices.ACTIVE)
@@ -56,19 +59,14 @@ class ConnectedAccount(models.Model):
         except Exception:
             return self.encrypted_refresh_token or ""
 
+    def set_credential_json(self, payload: str):
+        self.encrypted_credential_json = encrypt_token(payload) if payload else ''
 
-class OAuthState(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    state = models.CharField(max_length=255, unique=True, db_index=True)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='oauth_states')
-    code_verifier = models.CharField(max_length=255)
-    redirect_uri = models.CharField(max_length=500)
-    scopes = models.JSONField(default=list)
-    expires_at = models.DateTimeField()
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"OAuthState {self.state[:8]} for {self.user.email}"
+    def get_credential_json(self) -> str:
+        try:
+            return decrypt_token(self.encrypted_credential_json)
+        except Exception:
+            return self.encrypted_credential_json or ""
 
 
 class ExternalNotebook(models.Model):

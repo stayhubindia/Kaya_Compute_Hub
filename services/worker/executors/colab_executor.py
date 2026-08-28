@@ -37,20 +37,22 @@ def _activate_account(account) -> None:
     token_dir = Path.home() / ".config/colab-cli"
     token_dir.mkdir(parents=True, exist_ok=True)
     token_file = token_dir / "token.json"
-    payload = {
-        "token": account.get_access_token(),
-        "refresh_token": account.get_refresh_token(),
-        "token_uri": "https://oauth2.googleapis.com/token",
-        "client_id": os.environ.get("GOOGLE_OAUTH_CLIENT_ID", ""),
-        "client_secret": os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", ""),
-        "scopes": account.scopes or [],
-    }
+    payload = {}
+    raw_credentials = getattr(account, "get_credential_json", lambda: "")()
+    if raw_credentials:
+        try:
+            parsed = json.loads(raw_credentials)
+            if isinstance(parsed, dict):
+                payload.update(parsed)
+        except (TypeError, ValueError):
+            pass
+    payload["token"] = payload.get("token") or account.get_access_token()
+    payload["refresh_token"] = payload.get("refresh_token") or account.get_refresh_token()
+    payload["scopes"] = payload.get("scopes") or account.scopes or []
     if account.token_expiry:
         payload["expiry"] = account.token_expiry.isoformat().replace("+00:00", "Z")
     if not payload["token"] and not payload["refresh_token"]:
-        raise ColabExecutionError("Selected Google account has no usable OAuth token.")
-    if not payload["client_id"] or not payload["client_secret"]:
-        raise ColabExecutionError("VM Google OAuth client credentials are not configured.")
+        raise ColabExecutionError("Selected account has no usable Colab CLI credentials. Import its token.json from the account's Colab CLI.")
 
     temp_file = token_dir / f"token.{os.getpid()}.tmp"
     temp_file.write_text(json.dumps(payload), encoding="utf-8")
@@ -59,7 +61,9 @@ def _activate_account(account) -> None:
 
 
 def _cli(colab_bin: str, *args: str) -> list[str]:
-    return [colab_bin, "--auth=oauth2", *args]
+    # The official Colab CLI reads the active token.json directly. No app-level
+    # OAuth client or browser callback is used by the VM.
+    return [colab_bin, *args]
 
 
 def run_colab_job(job, update_progress_cb: Callable[[int, str, str], None]) -> dict:

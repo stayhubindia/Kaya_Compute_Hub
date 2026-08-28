@@ -2,15 +2,10 @@ from django.urls import path
 from apps.integrations import views
 
 urlpatterns = [
-    path('google/start/', views.google_oauth_start, name='google-oauth-start'),
-    path('google/callback/', views.google_oauth_callback, name='google-oauth-callback'),
     # Colab Vault Account Endpoints
-    path('google/auth-link/', views.google_colab_auth_link, name='google-colab-auth-link'),
-    path('google/verify-code/', views.google_colab_verify_code, name='google-colab-verify-code'),
     path('google/direct-connect/', views.google_account_direct_connect, name='google-account-direct-connect'),
     path('google/accounts/', views.google_accounts_list, name='google-accounts-list'),
     path('google/<uuid:pk>/verify/', views.google_account_verify, name='google-account-verify'),
-    path('google/<uuid:pk>/reconnect/', views.google_account_reconnect, name='google-account-reconnect'),
     path('google/<uuid:pk>/disconnect/', views.google_account_disconnect, name='google-account-disconnect'),
     path('google/<uuid:pk>/revoke/', views.google_account_revoke, name='google-account-revoke'),
 

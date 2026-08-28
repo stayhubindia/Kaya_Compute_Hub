@@ -39,4 +39,4 @@ def test_vm_worker_allocates_and_executes_colab_job(tmp_path, monkeypatch):
     assert result['session_name'] == 'training-t4'
     assert progress[-1] == (100, 'completed')
     assert run.call_args_list[1].args[0][-2:] == ['--gpu', 'T4']
-    assert run.call_args_list[2].args[0][1:5] == ['--auth=oauth2', 'exec', '-s', 'training-t4']
+    assert run.call_args_list[2].args[0][1:4] == ['exec', '-s', 'training-t4']
