@@ -223,7 +223,7 @@ export default function ConsolePage() {
     const isCloudTarget = terminalTarget === 'colab' && !isColabCli;
 
     const timeStr = new Date().toLocaleTimeString();
-    const promptPrefix = isCloudTarget ? 'root@colab-cloud:#' : 'durgesh@kaya-vm:$';
+    const promptPrefix = isCloudTarget ? `root@colab-cloud:${colabCwd}#` : 'durgesh@kaya-vm:$';
     setTerminalLogs(prev => [...prev, { timestamp: timeStr, type: 'cmd', text: `${promptPrefix} ${rawCmd}${stdinInput ? ' [input attached]' : ''}` }]);
     if (!cmdToRun) setCommandInput('');
     setIsExecutingCmd(true);
@@ -236,7 +236,7 @@ export default function ConsolePage() {
         // live kernel, so `cd drive` behaves like a real terminal command.
         const encodedCommand = btoa(unescape(encodeURIComponent(rawCmd)));
         const encodedCwd = btoa(unescape(encodeURIComponent(colabCwd)));
-        const pyWrapper = `import base64, os, subprocess, sys\ncmd = base64.b64decode('${encodedCommand}').decode()\ncwd = base64.b64decode('${encodedCwd}').decode()\nif cmd.strip() == 'cd' or cmd.strip().startswith('cd '):\n    destination = cmd.strip()[2:].strip() or '/content'\n    destination = os.path.expanduser(destination)\n    if not os.path.isabs(destination):\n        destination = os.path.normpath(os.path.join(cwd, destination))\n    if not os.path.isdir(destination):\n        print('cd: no such directory: ' + destination, file=sys.stderr)\n    else:\n        cwd = destination\nelse:\n    result = subprocess.run(cmd, shell=True, cwd=cwd, text=True, capture_output=True)\n    if result.stdout: print(result.stdout, end='')\n    if result.stderr: print(result.stderr, end='', file=sys.stderr)\nprint('KAYA_CWD=' + cwd)\n`;
+        const pyWrapper = `import base64, os, shlex, subprocess, sys\ncmd = base64.b64decode('${encodedCommand}').decode()\ncwd = base64.b64decode('${encodedCwd}').decode()\ntry:\n    parts = shlex.split(cmd)\nexcept ValueError as exc:\n    print('shell parse error: ' + str(exc), file=sys.stderr)\n    parts = []\nif parts and parts[0] == 'cd':\n    if len(parts) > 2:\n        print('cd: too many arguments', file=sys.stderr)\n    else:\n        destination = os.path.expanduser(parts[1] if len(parts) == 2 else '/content')\n        if not os.path.isabs(destination):\n            destination = os.path.normpath(os.path.join(cwd, destination))\n        if not os.path.isdir(destination):\n            print('cd: no such directory: ' + destination, file=sys.stderr)\n        else:\n            cwd = destination\nelif parts:\n    result = subprocess.run(cmd, shell=True, cwd=cwd, text=True, capture_output=True)\n    if result.stdout: print(result.stdout, end='')\n    if result.stderr: print(result.stderr, end='', file=sys.stderr)\nprint('KAYA_CWD=' + cwd)\n`;
         payload = { command: 'colab exec', stdin_input: pyWrapper };
       } else {
         payload = { command: rawCmd };
@@ -247,26 +247,21 @@ export default function ConsolePage() {
       const cwdMarker = /(?:^|\n)KAYA_CWD=([^\n\r]+)/;
       const cwdMatch = typeof data.stdout === 'string' ? data.stdout.match(cwdMarker) : null;
       if (cwdMatch) setColabCwd(cwdMatch[1].trim());
-      const visibleStdout = typeof data.stdout === 'string'
-        ? data.stdout
-            .replace(cwdMarker, '')
-            .split('\n')
-            .filter((line: string) => !(
-              line.startsWith('[colab] A new version of Colab CLI is available:') ||
-              line.startsWith("[colab] Run 'colab update' to update.") ||
-              line.startsWith('[colab] To silence this check, set') ||
-              line.startsWith('[colab] Using unique session')
-            ))
-            .join('\n')
-            .trim()
-        : '';
+      const stripColabNotices = (value: string) => value
+        .replace(/\[colab\] A new version of Colab CLI is available:[^\n]*\n?/g, '')
+        .replace(/\[colab\] Run 'colab update' to update\.\n?/g, '')
+        .replace(/\[colab\] To silence this check, set[^\n]*\n?/g, '')
+        .replace(/\[colab\] Using unique session '[^']+'\.\s*/g, '')
+        .trim();
+      const visibleStdout = typeof data.stdout === 'string' ? stripColabNotices(data.stdout.replace(cwdMarker, '')) : '';
+      const visibleStderr = typeof data.stderr === 'string' ? stripColabNotices(data.stderr) : '';
       if (visibleStdout) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: visibleStdout }]);
       }
-      if (data.stderr) {
-        setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: data.stderr }]);
+      if (visibleStderr) {
+        setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: visibleStderr }]);
       }
-      if (cwdMatch && !visibleStdout && !data.stderr) {
+      if (cwdMatch && !visibleStdout && !visibleStderr) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: `Directory changed to ${cwdMatch[1].trim()}` }]);
       } else if (!data.stdout && !data.stderr) {
         setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: `Command completed with exit code ${data.returncode} (${data.execution_time_ms}ms)` }]);
