@@ -127,6 +127,17 @@ export default function ConsolePage() {
   // Active Console View Mode: 'repl' | 'terminal' | 'runner'
   const [activeTab, setActiveTab] = useState<'repl' | 'terminal' | 'runner'>('repl');
 
+  // `colab exec` has no persistent shell process. Keep the chosen Colab
+  // directory across a browser refresh, then apply it to each kernel command.
+  useEffect(() => {
+    const savedCwd = window.localStorage.getItem('kaya-console-colab-cwd');
+    if (savedCwd?.startsWith('/content')) setColabCwd(savedCwd);
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('kaya-console-colab-cwd', colabCwd);
+  }, [colabCwd]);
+
   useEffect(() => {
     replEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [replHistory]);
