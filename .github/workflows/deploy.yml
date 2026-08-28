@@ -69,9 +69,6 @@ jobs:
           script: |
             set -e
             echo "==== Deploying Kaya Compute Hub to /home/Project/Kaya_Compute_Hub ===="
-            sudo mkdir -p /home/Project/Kaya_Compute_Hub
-            sudo chown -R durgesh:durgesh /home/Project/Kaya_Compute_Hub
-            
             cd /home/Project/Kaya_Compute_Hub
             if [ ! -d .git ]; then
               git clone https://github.com/stayhubindia/Kaya_Compute_Hub.git .
