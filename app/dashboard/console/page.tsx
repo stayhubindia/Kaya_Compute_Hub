@@ -259,7 +259,7 @@ export default function ConsolePage() {
     setIsExecutingCmd(true);
     try {
       const sessions = await integrationsClient.listColabSessions();
-      const active = sessions.sessions[0];
+      const active = sessions.sessions.find((session) => /^[A-Za-z0-9_-]{1,64}$/.test(session.name));
       if (!active) throw new Error('Create a Colab session first.');
       const mount = await integrationsClient.startColabDriveMount(active.name);
       setDriveMountId(mount.mount_id);
