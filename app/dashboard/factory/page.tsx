@@ -35,6 +35,9 @@ export default function DatasetFactoryPage() {
 
   // ArXiv Batch Downloader State
   const [arxivCategory, setArxivCategory] = useState("cs.AI");
+  const [arxivDriveCategory, setArxivDriveCategory] = useState("CS");
+  const [arxivDriveYear, setArxivDriveYear] = useState("2025");
+  const [arxivDriveFormat, setArxivDriveFormat] = useState<"pdf" | "html">("pdf");
   const [arxivMonth, setArxivMonth] = useState(() => {
     const d = new Date(); d.setMonth(d.getMonth() - 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
@@ -76,6 +79,21 @@ export default function DatasetFactoryPage() {
   const [isLoadingJobs, setIsLoadingJobs] = useState(true);
   const [colabSessions, setColabSessions] = useState<ColabSession[]>([]);
   const [selectedSessionName, setSelectedSessionName] = useState("");
+
+  const arxivDriveInputPath = `/content/drive/MyDrive/Arxiv/${arxivDriveCategory}/${arxivDriveYear}/${arxivDriveFormat}`;
+
+  const handleProcessArxivDriveDataset = () => {
+    setInputPath(arxivDriveInputPath);
+    setSourceName(`ArXiv ${arxivDriveCategory} ${arxivDriveYear} (${arxivDriveFormat.toUpperCase()})`);
+    void handleLaunchPipeline("ingest", {
+      input_path: arxivDriveInputPath,
+      source: "arxiv_drive",
+      max_documents: maxDocuments,
+      parse_latex: extractEquations,
+      clean_html: arxivDriveFormat === "html" && cleanHtml,
+      collection_slug: collectionSlug,
+    });
+  };
 
   // Load User, Jobs & Colab Vault Accounts
   const fetchJobs = async () => {
@@ -445,6 +463,37 @@ print('KAYA_RESULT={"output_dir": ' + repr(str(output_dir)) + ', "records": ' + 
           {/* TAB 0: ARXIV BATCH DOWNLOADER */}
           {activeTab === "arxiv" && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              <div style={{ background: 'rgba(14, 116, 144, 0.14)', border: '1px solid #155e75', borderRadius: '12px', padding: '18px' }}>
+                <h3 style={{ fontSize: '17px', fontWeight: '700', color: '#67e8f9', margin: 0 }}>📂 Process ArXiv dataset already in Google Drive</h3>
+                <p style={{ fontSize: '12px', color: '#a5f3fc', margin: '6px 0 16px', lineHeight: 1.5 }}>
+                  Drive layout detected: <code>Arxiv/&lt;category&gt;/&lt;year&gt;/pdf|html</code>. Select a branch and start ingestion on the mounted Colab runtime.
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', alignItems: 'end' }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#cffafe', marginBottom: '6px' }}>Category folder</label>
+                    <input value={arxivDriveCategory} onChange={(e) => setArxivDriveCategory(e.target.value.replace(/[^A-Za-z0-9_.-]/g, ''))} placeholder="CS" style={{ width: '100%', background: '#090d16', border: '1px solid #155e75', borderRadius: '7px', padding: '9px 11px', color: '#f8fafc', fontFamily: 'monospace' }} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#cffafe', marginBottom: '6px' }}>Year</label>
+                    <select value={arxivDriveYear} onChange={(e) => setArxivDriveYear(e.target.value)} style={{ width: '100%', background: '#090d16', border: '1px solid #155e75', borderRadius: '7px', padding: '9px 11px', color: '#f8fafc' }}>
+                      <option value="2025">2025 (papers found)</option>
+                      <option value="2026">2026 (currently empty)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '11px', fontWeight: '600', color: '#cffafe', marginBottom: '6px' }}>Source format</label>
+                    <select value={arxivDriveFormat} onChange={(e) => setArxivDriveFormat(e.target.value as "pdf" | "html")} style={{ width: '100%', background: '#090d16', border: '1px solid #155e75', borderRadius: '7px', padding: '9px 11px', color: '#f8fafc' }}>
+                      <option value="pdf">PDF</option>
+                      <option value="html">HTML</option>
+                    </select>
+                  </div>
+                  <button type="button" disabled={isSubmitting || !arxivDriveCategory} onClick={handleProcessArxivDriveDataset} style={{ background: isSubmitting ? '#334155' : '#0891b2', color: '#fff', border: 'none', borderRadius: '8px', padding: '11px 14px', fontWeight: '700', cursor: isSubmitting ? 'not-allowed' : 'pointer' }}>
+                    🚀 Start Drive Ingestion in Colab
+                  </button>
+                </div>
+                <div style={{ marginTop: '12px', fontFamily: 'monospace', fontSize: '11px', color: '#67e8f9' }}>{arxivDriveInputPath}</div>
+              </div>
+
               <div>
                 <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#f8fafc', margin: 0, display: 'flex', alignItems: 'center', gap: '10px' }}>
                   🔬 ArXiv Research Paper Batch Downloader
