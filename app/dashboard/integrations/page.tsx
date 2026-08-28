@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import DashboardNavbar from '@/components/DashboardNavbar';
 import { User, authClient } from '@/lib/api/authClient';
-import { integrationsClient, ConnectedAccount, DriveFile } from '@/lib/api/integrations-client';
+import { integrationsClient, ColabSession, ConnectedAccount, DriveFile } from '@/lib/api/integrations-client';
 import { colabClient, ExternalNotebook, ExternalRun } from '@/lib/api/colab-client';
 import { StatusBadge } from '@/components/shared/status-badge';
 import { LoadingState } from '@/components/shared/loading-state';
@@ -17,9 +17,13 @@ export default function IntegrationsDashboardPage() {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('');
   const [driveFiles, setDriveFiles] = useState<DriveFile[]>([]);
   const [notebooks, setNotebooks] = useState<ExternalNotebook[]>([]);
+  const [colabSessions, setColabSessions] = useState<ColabSession[]>([]);
   const [activeRun, setActiveRun] = useState<ExternalRun | null>(null);
   const [quotaExhaustedModal, setQuotaExhaustedModal] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshingColab, setIsRefreshingColab] = useState(false);
+  const [driveMountId, setDriveMountId] = useState<string | null>(null);
+  const [driveMountUrl, setDriveMountUrl] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,11 +45,26 @@ export default function IntegrationsDashboardPage() {
 
       const nbs = await colabClient.listNotebooks();
       setNotebooks(nbs);
+      const sessionsRes = await integrationsClient.listColabSessions();
+      setColabSessions(sessionsRes.sessions || []);
       setError(null);
     } catch (err: any) {
       setError(err?.message || 'Failed to load integrations data.');
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadColabSessions = async () => {
+    try {
+      setIsRefreshingColab(true);
+      const response = await integrationsClient.listColabSessions();
+      setColabSessions(response.sessions || []);
+      setError(null);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to fetch live Colab session status from the VM.');
+    } finally {
+      setIsRefreshingColab(false);
     }
   };
 
@@ -120,6 +139,64 @@ export default function IntegrationsDashboardPage() {
       setActionMessage('External notebook execution cancelled.');
     } catch (err: any) {
       setError(err?.message || 'Failed to cancel external run.');
+    }
+  };
+
+  const validColabSessionName = (name: string) => /^[A-Za-z0-9_-]{1,64}$/.test(name);
+
+  const handleCreateColabSession = async () => {
+    try {
+      const sessionName = `integration-${Date.now().toString(36)}`;
+      setActionMessage('Creating a CPU Colab session on the VM...');
+      const result = await integrationsClient.createColabSession({
+        account_id: selectedAccountId || undefined,
+        session_name: sessionName,
+        gpu_variant: 'CPU',
+      });
+      setActionMessage(`Colab session '${result.session_name}' is ready. Refreshing live state...`);
+      await loadColabSessions();
+    } catch (err: any) {
+      setError(err?.message || 'Failed to create Colab session. Authorize the Colab CLI first if required.');
+    }
+  };
+
+  const handleStartDriveMount = async (sessionName: string) => {
+    if (!validColabSessionName(sessionName)) {
+      setError('Select a named, active Colab session before mounting Drive.');
+      return;
+    }
+    try {
+      setActionMessage(`Preparing Google Drive consent for '${sessionName}'...`);
+      const result = await integrationsClient.startColabDriveMount(sessionName);
+      setDriveMountId(result.mount_id);
+      setDriveMountUrl(result.authorization_url);
+      window.open(result.authorization_url, '_blank', 'noopener,noreferrer');
+      setActionMessage('Drive authorization opened in a new tab. Grant access, then click Complete Drive Mount below.');
+    } catch (err: any) {
+      setError(err?.message || 'Could not start Google Drive mount for this Colab session.');
+    }
+  };
+
+  const handleCompleteDriveMount = async () => {
+    if (!driveMountId) return;
+    try {
+      const result = await integrationsClient.completeColabDriveMount(driveMountId);
+      setActionMessage(result.message || 'Drive consent sent to Colab. Refreshing the live state...');
+      setDriveMountId(null);
+      setDriveMountUrl(null);
+      await loadColabSessions();
+    } catch (err: any) {
+      setError(err?.message || 'Could not complete Google Drive mount.');
+    }
+  };
+
+  const handleStopColabSession = async (sessionName: string) => {
+    try {
+      await integrationsClient.stopColabSession(sessionName);
+      setActionMessage(`Colab session '${sessionName}' was terminated.`);
+      await loadColabSessions();
+    } catch (err: any) {
+      setError(err?.message || `Failed to terminate Colab session '${sessionName}'.`);
     }
   };
 
@@ -202,6 +279,48 @@ export default function IntegrationsDashboardPage() {
             ))}
           </select>
         </div>
+
+        <section style={{ background: '#172033', border: '1px solid #2563eb', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
+            <div>
+              <h2 style={{ fontSize: '17px', fontWeight: '700' }}>⚡ Live Colab Runtime & Drive</h2>
+              <p style={{ fontSize: '12px', color: '#94a3b8', marginTop: '3px' }}>Live state from the VM&apos;s Colab CLI; this is the same runtime used by Console & Runner.</p>
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={handleCreateColabSession} style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '7px', fontWeight: '600', cursor: 'pointer', fontSize: '12px' }}>+ Create CPU Session</button>
+              <button onClick={loadColabSessions} disabled={isRefreshingColab} style={{ background: '#334155', color: '#fff', border: 'none', padding: '8px 12px', borderRadius: '7px', fontWeight: '600', cursor: isRefreshingColab ? 'wait' : 'pointer', fontSize: '12px' }}>{isRefreshingColab ? 'Refreshing...' : '↻ Refresh Live Status'}</button>
+            </div>
+          </div>
+
+          {colabSessions.filter((session) => validColabSessionName(session.name)).length === 0 ? (
+            <p style={{ color: '#fbbf24', fontSize: '13px', margin: 0 }}>No named active Colab session on the VM. Create one here or from Workers/Console, then refresh.</p>
+          ) : (
+            <div style={{ display: 'grid', gap: '10px' }}>
+              {colabSessions.filter((session) => validColabSessionName(session.name)).map((session) => (
+                <div key={session.name} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '12px', display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap' }}>
+                  <div>
+                    <div style={{ fontFamily: 'monospace', fontWeight: '700', color: '#e2e8f0' }}>{session.name} <span style={{ color: '#34d399', fontFamily: 'system-ui', fontSize: '12px' }}>● CONNECTED</span></div>
+                    <div style={{ color: '#94a3b8', fontSize: '12px', marginTop: '3px' }}>{session.accelerator || 'CPU'} · {session.variant || 'DEFAULT'} · Drive: <span style={{ color: session.drive_mounted === true ? '#34d399' : session.drive_mounted === false ? '#fbbf24' : '#94a3b8', fontWeight: '600' }}>{session.drive_mounted === true ? 'MOUNTED' : session.drive_mounted === false ? 'NOT MOUNTED' : 'CHECKING'}</span></div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {session.drive_mounted !== true && <button onClick={() => handleStartDriveMount(session.name)} style={{ background: '#a16207', color: '#fff', border: 'none', padding: '7px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>📁 Mount Drive</button>}
+                    <button onClick={() => handleStopColabSession(session.name)} style={{ background: '#991b1b', color: '#fff', border: 'none', padding: '7px 10px', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Terminate</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {driveMountUrl && driveMountId && (
+            <div style={{ background: '#0c4a6e55', border: '1px solid #0284c7', borderRadius: '8px', padding: '12px', marginTop: '12px', fontSize: '13px' }}>
+              <div style={{ color: '#bae6fd', marginBottom: '8px' }}>Grant Drive access in the opened Google page, then complete the mount.</div>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                <a href={driveMountUrl} target="_blank" rel="noreferrer" style={{ color: '#38bdf8', padding: '7px 10px', border: '1px solid #0284c7', borderRadius: '6px' }}>Open Drive authorization</a>
+                <button onClick={handleCompleteDriveMount} style={{ background: '#0284c7', color: '#fff', border: 'none', padding: '7px 10px', borderRadius: '6px', fontWeight: '600', cursor: 'pointer' }}>Complete Drive Mount</button>
+              </div>
+            </div>
+          )}
+        </section>
 
         {/* Tab Buttons */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', borderBottom: '1px solid #334155', paddingBottom: '8px' }}>
