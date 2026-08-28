@@ -4,7 +4,7 @@ from celery import shared_task
 from apps.jobs.models import Job, JobStatusChoices
 from apps.jobs.services import transition_job_status, update_job_progress, claim_job_atomically
 from apps.audit.services import log_audit_event
-from services.worker.executors.colab_executor import run_colab_job
+from services.worker.executors.colab_executor import ColabExecutionError, run_colab_job
 
 logger = logging.getLogger(__name__)
 
@@ -74,6 +74,12 @@ def execute_job(self, job_id: str, worker_name: str = "celery-worker-01"):
         # Permanent failure (unsupported job type) -> do not retry
         logger.error(f"Job {job.id} permanent error: {e}")
         transition_job_status(job, JobStatusChoices.FAILED, error_code="NOT_IMPLEMENTED", error_message=str(e))
+        return {"status": "failed", "error": str(e)}
+
+    except ColabExecutionError as e:
+        # Invalid session/account/Drive state cannot be fixed by a blind retry.
+        logger.error(f"Job {job.id} Colab dispatch error: {e}")
+        transition_job_status(job, JobStatusChoices.FAILED, error_code="COLAB_EXECUTION_ERROR", error_message=str(e))
         return {"status": "failed", "error": str(e)}
 
     except Exception as exc:

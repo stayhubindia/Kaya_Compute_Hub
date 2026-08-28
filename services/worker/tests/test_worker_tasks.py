@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 import pytest
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -60,11 +61,14 @@ def test_execute_job_demo_download_success():
         name="Download Demo Job",
         job_type=JobTypeChoices.DOWNLOAD,
         status=JobStatusChoices.QUEUED,
-        created_by=admin
+        created_by=admin,
+        payload={'execution_target': 'colab', 'session_name': 'colab-job', 'code': 'print("run in colab")'},
     )
 
-    result = execute_job(str(job.id))
+    with patch('services.worker.tasks.job_tasks.run_colab_job', return_value={'execution_target': 'colab'}) as dispatch:
+        result = execute_job(str(job.id))
     assert result['status'] == 'succeeded'
+    dispatch.assert_called_once()
 
     job.refresh_from_db()
     assert job.status == JobStatusChoices.SUCCEEDED
@@ -77,7 +81,8 @@ def test_execute_job_unsupported_notebook_fails():
         name="Notebook Execution Job",
         job_type=JobTypeChoices.NOTEBOOK,
         status=JobStatusChoices.QUEUED,
-        created_by=admin
+        created_by=admin,
+        payload={'execution_target': 'colab', 'session_name': 'colab-job'},
     )
 
     result = execute_job(str(job.id))
@@ -85,7 +90,7 @@ def test_execute_job_unsupported_notebook_fails():
 
     job.refresh_from_db()
     assert job.status == JobStatusChoices.FAILED
-    assert job.error_code == 'NOT_IMPLEMENTED'
+    assert job.error_code == 'COLAB_EXECUTION_ERROR'
 
 @pytest.mark.django_db
 def test_job_cancellation():

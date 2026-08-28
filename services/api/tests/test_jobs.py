@@ -2,12 +2,14 @@ import pytest
 from rest_framework.test import APIClient
 from rest_framework.exceptions import ValidationError
 from apps.accounts.models import User
+from apps.integrations.models import AccountStatusChoices, ConnectedAccount
 from apps.jobs.models import Job, JobStatusChoices, JobTypeChoices
 from apps.jobs.services import transition_job_status
 
 @pytest.mark.django_db
 def test_job_creation_and_permissions():
     admin = User.objects.create_admin('admin@kaya.local', 'pass')
+    account = ConnectedAccount.objects.create(user=admin, provider='google', provider_account_id='job-1', email='job@example.com', status=AccountStatusChoices.ACTIVE)
     client = APIClient()
 
     # Unauthenticated should be denied
@@ -23,7 +25,8 @@ def test_job_creation_and_permissions():
     resp = client.post('/api/v1/jobs/', {
         'name': 'Dataset Download Job',
         'job_type': 'download',
-        'payload': {'url': 'https://example.com/data.zip'}
+        'selected_google_account_id': str(account.id),
+        'payload': {'session_name': 'colab-job', 'code': 'print("download in colab")'}
     }, format='json')
     assert resp.status_code == 201
     assert resp.json()['status'] == 'queued'
@@ -31,14 +34,16 @@ def test_job_creation_and_permissions():
 @pytest.mark.django_db
 def test_job_idempotency():
     admin = User.objects.create_admin('admin@kaya.local', 'pass')
+    account = ConnectedAccount.objects.create(user=admin, provider='google', provider_account_id='job-2', email='idempotent@example.com', status=AccountStatusChoices.ACTIVE)
     client = APIClient()
     client.force_authenticate(user=admin)
 
     payload = {
         'name': 'Idempotent Preprocessing',
         'job_type': 'preprocessing',
+        'selected_google_account_id': str(account.id),
         'idempotency_key': 'key-12345',
-        'payload': {}
+        'payload': {'session_name': 'colab-job', 'code': 'print("preprocessing in colab")'}
     }
 
     res1 = client.post('/api/v1/jobs/', payload, format='json')
