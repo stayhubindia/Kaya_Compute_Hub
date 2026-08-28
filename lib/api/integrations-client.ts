@@ -24,6 +24,15 @@ export interface DriveFile {
   md5Checksum?: string;
 }
 
+export interface ColabSession {
+  name: string;
+  endpoint: string;
+  accelerator: string;
+  variant: string;
+  status: string;
+  drive_mounted?: boolean | null;
+}
+
 export const integrationsClient = {
   listConnectedAccounts: async (): Promise<ConnectedAccount[]> => {
     const res = await api.get<{ results: ConnectedAccount[] }>('/integrations/google/accounts/');
@@ -71,8 +80,8 @@ export const integrationsClient = {
     return api.post('/integrations/colab/sessions/create/', data);
   },
 
-  listColabSessions: async (): Promise<{ output_raw: string; sessions: string[]; active_count: number }> => {
-    return api.get('/integrations/colab/sessions/');
+  listColabSessions: async (): Promise<{ output_raw: string; sessions: ColabSession[]; active_count: number; cli_error?: string }> => {
+    return api.get('/integrations/colab/sessions/?include_drive_status=1');
   },
 
   stopColabSession: async (sessionName: string): Promise<{ status: string; session_name: string; message: string }> => {

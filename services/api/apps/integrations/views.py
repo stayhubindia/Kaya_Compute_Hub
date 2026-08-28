@@ -5,6 +5,7 @@ import json
 import shutil
 import subprocess
 import hashlib
+import re
 from pathlib import Path
 from datetime import timedelta
 
@@ -40,6 +41,49 @@ from services.integrations.colab_enterprise.client import ColabEnterpriseClient
 from services.integrations.colab_enterprise.executions import ExternalRunStatus
 from services.integrations.google.errors import GoogleDriveError
 from services.worker.executors.colab_executor import _activate_account, _cli
+
+
+_COLAB_SESSION_LINE = re.compile(
+    r"^\[(?P<name>[^\]]+)\]\s+(?P<endpoint>\S+)\s+\|\s+"
+    r"Hardware:\s+(?P<accelerator>[^|]+?)\s+\|\s+Variant:\s+(?P<variant>[^|]+?)(?:\s+\|\s+Status:\s+(?P<status>.+))?$"
+)
+
+
+def _parse_colab_sessions(output: str) -> list[dict]:
+    """Return only actual `colab sessions` records, never CLI notices/logs."""
+    sessions = []
+    for line in output.splitlines():
+        match = _COLAB_SESSION_LINE.match(line.strip())
+        if not match:
+            continue
+        sessions.append({key: (value or "").strip() for key, value in match.groupdict().items()})
+    return sessions
+
+
+def _probe_drive_mount(colab_bin: str, session_name: str) -> bool | None:
+    """Ask a live Colab kernel whether its Drive FUSE mount is present."""
+    probe = Path("/tmp") / f"kaya-drive-probe-{uuid.uuid4().hex}.py"
+    try:
+        probe.write_text(
+            "import os\nprint('KAYA_DRIVE_MOUNTED=' + str(os.path.ismount('/content/drive')))\n",
+            encoding="utf-8",
+        )
+        result = subprocess.run(
+            _cli(colab_bin, "exec", "-s", session_name, "-f", str(probe), "--timeout", "12"),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=18,
+        )
+        if "KAYA_DRIVE_MOUNTED=True" in result.stdout:
+            return True
+        if "KAYA_DRIVE_MOUNTED=False" in result.stdout:
+            return False
+    except (OSError, subprocess.SubprocessError):
+        pass
+    finally:
+        probe.unlink(missing_ok=True)
+    return None
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -517,10 +561,10 @@ def colab_session_create(request):
         proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=90)
         output = f"{proc.stdout}\n{proc.stderr}"
 
-        if proc.returncode != 0 and ("ColabRequestError" in output or "412" in output or "503" in output):
+        if proc.returncode != 0:
             return Response({
                 "status": "error",
-                "message": f"Colab session allocation failed: {proc.stderr.strip() or proc.stdout.strip()}"
+                "message": f"Colab session allocation failed: {proc.stderr.strip() or proc.stdout.strip() or 'Colab CLI returned a non-zero exit status.'}"
             }, status=status.HTTP_400_BAD_REQUEST)
 
         # Readiness ping check on Colab VM Kernel
@@ -573,12 +617,17 @@ def colab_sessions_list(request):
 
     try:
         proc = subprocess.run(_cli(colab_bin, "sessions"), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=15)
-        raw_lines = [l.strip() for l in proc.stdout.splitlines() if l.strip()]
+        sessions = _parse_colab_sessions(proc.stdout)
+        include_drive_status = request.query_params.get("include_drive_status") in {"1", "true", "True"}
+        if include_drive_status:
+            for session in sessions:
+                session["drive_mounted"] = _probe_drive_mount(colab_bin, session["name"])
 
         return Response({
             "output_raw": proc.stdout,
-            "sessions": raw_lines,
-            "active_count": len(raw_lines)
+            "sessions": sessions,
+            "active_count": len(sessions),
+            "cli_error": proc.stderr.strip() if proc.returncode else "",
         })
     except Exception as e:
         return Response({"output_raw": "", "sessions": [], "active_count": 0, "error": str(e)})

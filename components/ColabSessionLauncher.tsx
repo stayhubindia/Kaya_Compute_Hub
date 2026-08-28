@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { integrationsClient, ConnectedAccount } from '@/lib/api/integrations-client';
+import { integrationsClient, ConnectedAccount, ColabSession } from '@/lib/api/integrations-client';
 
 interface ColabSessionLauncherProps {
   onSessionCreated?: (sessionName: string) => void;
@@ -14,7 +14,7 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
   const [gpuVariant, setGpuVariant] = useState<string>('T4');
   const [isAllocating, setIsAllocating] = useState<boolean>(false);
   const [statusLogs, setStatusLogs] = useState<string[]>([]);
-  const [activeSessions, setActiveSessions] = useState<string[]>([]);
+  const [activeSessions, setActiveSessions] = useState<ColabSession[]>([]);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -33,7 +33,6 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
     }
   };
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchAccountsAndSessions(); }, []);
 
   const handleLaunchSession = async () => {
@@ -252,16 +251,15 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
           </h3>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {activeSessions.map((sess, i) => (
-              <div key={i} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              {activeSessions.map((sess) => (
+              <div key={`${sess.name}-${sess.endpoint}`} style={{ background: '#0f172a', border: '1px solid #334155', borderRadius: '8px', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontFamily: 'monospace', fontSize: '13px', color: '#34d399', fontWeight: '600' }}>
-                  ✓ {sess}
+                  ✓ {sess.name} · {sess.accelerator} · {sess.status || 'ACTIVE'} · Drive: {sess.drive_mounted === true ? 'mounted' : sess.drive_mounted === false ? 'not mounted' : 'not verified'}
                 </span>
 
                 <button
                   onClick={() => {
-                    const sName = sess.split(' ')[0].replace('Session:', '').trim();
-                    handleStopSession(sName || sessionName);
+                    handleStopSession(sess.name);
                   }}
                   style={{ background: '#991b1b', color: '#fff', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', fontWeight: '600' }}
                 >
@@ -270,6 +268,12 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {activeSessions.length === 0 && (
+        <div style={{ marginTop: '24px', borderTop: '1px solid #334155', paddingTop: '16px', color: '#94a3b8', fontSize: '13px' }}>
+          No active Colab sessions. Google Drive is not mounted because there is no live Colab kernel to mount it in.
         </div>
       )}
     </div>
