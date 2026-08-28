@@ -13,6 +13,11 @@ def test_vm_worker_allocates_and_executes_colab_job(tmp_path, monkeypatch):
         token_expiry=None,
         get_access_token=lambda: 'access-token',
         get_refresh_token=lambda: 'refresh-token',
+        get_credential_json=lambda: (
+            '{"token":"access-token","refresh_token":"refresh-token",'
+            '"client_id":"colab-cli-client","client_secret":"colab-cli-secret",'
+            '"token_uri":"https://oauth2.googleapis.com/token"}'
+        ),
     )
     job = SimpleNamespace(
         id='12345678-1234-1234-1234-123456789012',
