@@ -288,6 +288,23 @@ export default function ConsolePage() {
     }
   };
 
+  const handleCreateNamedConsoleSession = async () => {
+    if (!selectedAccountId) {
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: 'Authorize a Colab account first.' }]);
+      return;
+    }
+    setIsExecutingCmd(true);
+    const name = `console-${Math.random().toString(36).slice(2, 8)}`;
+    try {
+      const result = await integrationsClient.createColabSession({ account_id: selectedAccountId, session_name: name, gpu_variant: 'CPU' });
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stdout', text: `${result.message}\nSession name: ${name}` }]);
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: err?.message || 'Could not create Colab session.' }]);
+    } finally {
+      setIsExecutingCmd(false);
+    }
+  };
+
   const handleExecuteScript = async () => {
     if (!codeContent.trim()) return;
 
@@ -611,8 +628,8 @@ export default function ConsolePage() {
               <button onClick={() => handleRunCommand('colab sessions')} style={{ background: '#1e1b4b', color: '#818cf8', border: '1px solid #4338ca', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                 Colab Sessions
               </button>
-              <button onClick={() => handleRunCommand('colab new')} style={{ background: '#4c1d95', color: '#c084fc', border: '1px solid #6b21a8', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                + Auth Colab (colab new)
+              <button onClick={handleCreateNamedConsoleSession} style={{ background: '#4c1d95', color: '#c084fc', border: '1px solid #6b21a8', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                + Create Named Colab Session
               </button>
               <button onClick={() => handleRunCommand('colab status')} style={{ background: '#1e293b', color: '#38bdf8', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 Colab Status

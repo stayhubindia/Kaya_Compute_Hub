@@ -817,14 +817,6 @@ def colab_session_create(request):
         except Exception as exc:
             return Response({"error": {"message": str(exc)}}, status=status.HTTP_400_BAD_REQUEST)
 
-    # Clear stale sessions cache
-    sessions_cache = Path.home() / ".config/colab-cli/sessions.json"
-    if sessions_cache.exists():
-        try:
-            sessions_cache.unlink()
-        except Exception:
-            pass
-
     colab_bin = _get_colab_bin()
 
     # Stop orphan local assignment first
