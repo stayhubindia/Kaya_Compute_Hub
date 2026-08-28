@@ -84,6 +84,10 @@ export const integrationsClient = {
     return api.post('/integrations/colab/authorize/start/', {});
   },
 
+  pendingColabAuthorization: async (): Promise<{ pending: boolean; authorization_id?: string; authorization_url?: string; expires_at?: number }> => {
+    return api.get('/integrations/colab/authorize/pending/');
+  },
+
   completeColabAuthorization: async (authorizationId: string, callbackUrl: string): Promise<{ status: string; account: ConnectedAccount }> => {
     return api.post('/integrations/colab/authorize/complete/', {
       authorization_id: authorizationId,

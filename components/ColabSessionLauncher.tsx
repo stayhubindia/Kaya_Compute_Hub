@@ -39,6 +39,17 @@ export default function ColabSessionLauncher({ onSessionCreated }: ColabSessionL
 
   useEffect(() => { fetchAccountsAndSessions(); }, []);
 
+  useEffect(() => {
+    integrationsClient.pendingColabAuthorization()
+      .then((pending) => {
+        if (pending.pending && pending.authorization_id && pending.authorization_url) {
+          setAuthorizationId(pending.authorization_id);
+          setAuthorizationUrl(pending.authorization_url);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
   const handleLaunchSession = async () => {
     if (!selectedAccountId && accounts.length > 0) {
       setErrorMessage('Please select an authenticated Vault account.');

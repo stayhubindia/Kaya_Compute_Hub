@@ -199,6 +199,31 @@ def colab_authorization_start(request):
     }, status=status.HTTP_201_CREATED)
 
 
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def colab_authorization_pending(request):
+    """Restore a still-valid browser authorization after a UI refresh/navigation."""
+    if not _COLAB_AUTH_DIR.exists():
+        return Response({"pending": False})
+    pending = []
+    for path in _COLAB_AUTH_DIR.glob("*.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if payload.get("user_id") == str(request.user.id) and payload.get("expires_at", 0) > time.time():
+            pending.append((payload.get("expires_at", 0), path.stem, payload))
+    if not pending:
+        return Response({"pending": False})
+    _, auth_id, payload = max(pending)
+    return Response({
+        "pending": True,
+        "authorization_id": auth_id,
+        "authorization_url": payload.get("authorization_url", ""),
+        "expires_at": payload.get("expires_at"),
+    })
+
+
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
 def colab_authorization_complete(request):
