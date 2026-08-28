@@ -111,6 +111,8 @@ export default function ConsolePage() {
     { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Kaya Compute Colab Interactive Terminal v2.0 connected.\n[TARGET: 🌐 Google Colab Cloud Container (root@colab-cloud:#)]\nType any bash command (whoami, pwd, ls -la, nvidia-smi) to execute directly inside your Colab container.' }
   ]);
   const [isExecutingCmd, setIsExecutingCmd] = useState(false);
+  const [driveMountId, setDriveMountId] = useState<string | null>(null);
+  const [driveMountUrl, setDriveMountUrl] = useState<string | null>(null);
 
   // Interactive Colab REPL State
   const [replInput, setReplInput] = useState('');
@@ -248,6 +250,39 @@ export default function ConsolePage() {
       }
     } catch (err: any) {
       setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: err.message || 'Execution error' }]);
+    } finally {
+      setIsExecutingCmd(false);
+    }
+  };
+
+  const handleMountDrive = async () => {
+    setIsExecutingCmd(true);
+    try {
+      const sessions = await integrationsClient.listColabSessions();
+      const active = sessions.sessions[0];
+      if (!active) throw new Error('Create a Colab session first.');
+      const mount = await integrationsClient.startColabDriveMount(active.name);
+      setDriveMountId(mount.mount_id);
+      setDriveMountUrl(mount.authorization_url);
+      window.open(mount.authorization_url, '_blank', 'noopener,noreferrer');
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: 'Drive authorization opened in a new tab. Grant access, then click Complete Drive Mount below.' }]);
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: err?.message || 'Could not start Drive mount.' }]);
+    } finally {
+      setIsExecutingCmd(false);
+    }
+  };
+
+  const handleCompleteDriveMount = async () => {
+    if (!driveMountId) return;
+    setIsExecutingCmd(true);
+    try {
+      const result = await integrationsClient.completeColabDriveMount(driveMountId);
+      setDriveMountId(null);
+      setDriveMountUrl(null);
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'system', text: result.message }]);
+    } catch (err: any) {
+      setTerminalLogs(prev => [...prev, { timestamp: new Date().toLocaleTimeString(), type: 'stderr', text: err?.message || 'Could not complete Drive mount.' }]);
     } finally {
       setIsExecutingCmd(false);
     }
@@ -411,7 +446,7 @@ export default function ConsolePage() {
                   ⚡ Check GPU
                 </button>
                 <button
-                  onClick={() => handleRunCommand('colab drivemount')}
+                  onClick={handleMountDrive}
                   style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                 >
                   📁 Mount Drive
@@ -585,7 +620,7 @@ export default function ConsolePage() {
               <button onClick={() => handleRunCommand('nvidia-smi')} style={{ background: '#1e293b', color: '#34d399', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', cursor: 'pointer' }}>
                 GPU Status
               </button>
-              <button onClick={() => handleRunCommand('colab drivemount')} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+              <button onClick={handleMountDrive} style={{ background: '#1e293b', color: '#fbbf24', border: '1px solid #334155', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
                 📁 Mount Drive
               </button>
               <button onClick={() => handleRunCommand('colab restart-kernel')} style={{ background: '#7f1d1d', color: '#fca5a5', border: '1px solid #991b1b', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
@@ -596,6 +631,13 @@ export default function ConsolePage() {
               </button>
             </div>
           </div>
+
+          {driveMountUrl && (
+            <div style={{ marginBottom: '12px', padding: '10px', borderRadius: '8px', background: '#14532d22', border: '1px solid #16a34a', color: '#dcfce7', fontSize: '12px' }}>
+              <a href={driveMountUrl} target="_blank" rel="noreferrer" style={{ color: '#86efac', fontWeight: '700', wordBreak: 'break-all' }}>Open Google Drive authorization</a>
+              <button onClick={handleCompleteDriveMount} disabled={isExecutingCmd} style={{ marginLeft: '12px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '6px', padding: '5px 9px', fontWeight: '600', cursor: 'pointer' }}>Complete Drive Mount</button>
+            </div>
+          )}
 
           {/* Terminal Viewport */}
           <div style={{ background: '#020617', border: '1px solid #1e293b', borderRadius: '8px', padding: '16px', fontFamily: 'monospace', fontSize: '13px', height: '260px', overflowY: 'auto', marginBottom: '12px' }}>
