@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
 import DashboardNavbar from '@/components/DashboardNavbar';
 import { User, authClient } from '@/lib/api/authClient';
 import { api } from '@/lib/api/client';
@@ -12,8 +13,9 @@ import { ArtifactListTable } from '@/components/features/artifacts/artifact-list
 import { useJobLogs } from '@/lib/hooks/use-job-logs';
 import { useJobEvents } from '@/lib/hooks/use-job-events';
 
-export default function JobDetailPage({ params }: { params: { id: string } }) {
-  const jobId = params?.id;
+export default function JobDetailPage() {
+  const params = useParams<{ id: string }>();
+  const jobId = typeof params?.id === 'string' ? params.id : '';
 
   const [user, setUser] = useState<User | null>(null);
   const [job, setJob] = useState<any>(null);
@@ -28,6 +30,12 @@ export default function JobDetailPage({ params }: { params: { id: string } }) {
   const { isConnected } = useJobEvents(jobId);
 
   const loadJobDetails = React.useCallback(async () => {
+    if (!jobId) {
+      setError('Invalid job ID.');
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const userData = await authClient.getCurrentUser();
